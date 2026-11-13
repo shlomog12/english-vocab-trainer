@@ -573,7 +573,7 @@ document.addEventListener("click", (e) => {
 // ---------- boot ----------
 (async function boot() {
   try {
-    BASE = await (await fetch("words.json")).json();
+    BASE = await (await fetch("words.json?v=4")).json();
   } catch (e) {
     q("main").innerHTML = '<div class="panel empty">לא הצלחתי לטעון את words.json. פתח את האתר דרך כתובת (לא כקובץ מקומי).</div>';
     return;
