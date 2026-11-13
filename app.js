@@ -1,4 +1,4 @@
-import { buildSession, markIndexAt } from "./audio.js";
+import { buildSession, markIndexAt, encodeWav } from "./audio.js";
 import { getWav, selfTest, clearCache, cacheSize } from "./tts.js";
 
 // ---------- words ----------
@@ -6,7 +6,7 @@ let BASE = [];
 const KEY = "eng-vocab-trainer-v1";
 const S = {
   known: {}, removed: {}, custom: [], sel: {}, dir: "en2he", tab: "cards", auto: false,
-  listen: { pause: 1, gap: 2, shuf: false }
+  listen: { pause: 1, gap: 2, shuf: false, mode: "speech", rate: 0.9 }
 };
 try {
   const sv = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -240,12 +240,13 @@ function setMedia(w) {
 function installMediaHandlers() {
   if (!("mediaSession" in navigator)) return;
   const h = (n, f) => { try { navigator.mediaSession.setActionHandler(n, f); } catch (e) {} };
-  h("play", () => aud.play());
-  h("pause", () => aud.pause());
+  h("play", () => (S.listen.mode === "speech" ? startSpeech() : aud.play()));
+  h("pause", () => (S.listen.mode === "speech" ? stopSpeech() : aud.pause()));
   h("nexttrack", () => jump(1));
   h("previoustrack", () => jump(-1));
 }
 function jump(d) {
+  if (S.listen.mode === "speech") { spJump(d); return; }
   if (!L.sess) return;
   const m = L.sess.marks;
   const i = (markIndexAt(m, aud.currentTime) + d + m.length) % m.length;
@@ -260,7 +261,7 @@ function showNow(i) {
   setMedia(w);
 }
 aud.addEventListener("timeupdate", () => {
-  if (!L.sess) return;
+  if (S.listen.mode !== "wav" || !L.sess) return;
   const i = markIndexAt(L.sess.marks, aud.currentTime);
   if (i !== L.idx) showNow(i);
 });
@@ -268,7 +269,7 @@ aud.addEventListener("play", () => { if (S.tab === "listen") updPlayBtn(); });
 aud.addEventListener("pause", () => { if (S.tab === "listen") updPlayBtn(); });
 function updPlayBtn() {
   const b = q("lplay");
-  if (b) b.textContent = L.building ? "⏳ מכין..." : aud.paused ? "▶ נגן" : "⏸ עצור";
+  if (b) b.textContent = L.building ? "⏳ מכין..." : (S.listen.mode === "speech" ? !SP.on : aud.paused) ? "▶ נגן" : "⏸ עצור";
 }
 function setProgress(t) {
   L.progress = t;
@@ -297,6 +298,11 @@ async function prepareSession() {
   }
 }
 async function playListen() {
+  if (S.listen.mode === "speech") {
+    if (SP.on) stopSpeech(); else startSpeech();
+    setTimeout(updPlayBtn, 50);
+    return;
+  }
   if (L.building) return;
   if (!aud.paused) { aud.pause(); return; }
   toast("");
@@ -311,12 +317,111 @@ async function playListen() {
   if ("mediaSession" in navigator) { try { navigator.mediaSession.playbackState = "playing"; } catch (e) {} }
 }
 function listenKnown() {
+  if (S.listen.mode === "speech") { spKnown(); return; }
   if (!L.sess || L.idx < 0) return;
   const id = L.sess.marks[L.idx].id;
   S.known[id] = 1; save(); L.stale = true;
   renderTop();
   toast("סומנה כידועה. היא תדולג בהכנה הבאה (עצור ולחץ נגן).", 3500);
 }
+// ----- listen mode B: device speech + silent looping <audio> (keeps the media session alive) -----
+const SP = { on: false, list: [], idx: 0, token: 0, bgSpoken: 0, hideAt: null, bgAtHide: 0, url: null };
+function silentUrl() {
+  if (!SP.url) {
+    const a = new Int16Array(16000);
+    for (let i = 0; i < a.length; i++) a[i] = ((Math.random() * 5) | 0) - 2; // near-silent dither, so it is real audio
+    SP.url = URL.createObjectURL(new Blob([encodeWav(a, 8000)], { type: "audio/wav" }));
+  }
+  return SP.url;
+}
+function sayText(text, lang, cb) {
+  let done = false, t;
+  const fin = () => { if (done) return; done = true; clearTimeout(t); cb(); };
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === "he" ? "he-IL" : "en-US"; u.rate = +S.listen.rate || 0.9;
+    const pre = lang === "he" ? ["he", "iw"] : ["en"];
+    const v = (speechSynthesis.getVoices() || []).filter((x) => pre.some((p) => (x.lang || "").toLowerCase().indexOf(p) === 0))[0];
+    if (v) u.voice = v;
+    u.onstart = () => { if (document.hidden) { SP.bgSpoken++; updBgLog(); } };
+    u.onend = fin; u.onerror = fin;
+    t = setTimeout(fin, 6000 + text.length * 250); // if the browser swallows the utterance, keep the loop going
+    speechSynthesis.speak(u);
+  } catch (e) { fin(); }
+}
+function showWordSp(w) {
+  const el = q("lnow");
+  setMedia(w);
+  if (!el) return;
+  el.innerHTML = '<div class="big he">' + esc(w.he) + '</div><div class="big" dir="ltr" style="margin-top:8px">' + esc(w.en) + '</div><div class="hint">' + (SP.idx + 1) + " / " + SP.list.length + "</div>";
+}
+function spStep(tok) {
+  if (tok !== SP.token || !SP.on) return;
+  if (SP.idx >= SP.list.length) {
+    SP.list = S.listen.shuf ? shuffle(pool()) : pool(); SP.idx = 0;
+    if (!SP.list.length) { stopSpeech(); render(); return; }
+  }
+  const w = SP.list[SP.idx];
+  showWordSp(w);
+  sayText(cleanHe(w.he), "he", () => {
+    if (tok !== SP.token) return;
+    setTimeout(() => {
+      if (tok !== SP.token) return;
+      sayText(cleanEn(w.en), "en", () => {
+        if (tok !== SP.token) return;
+        setTimeout(() => { if (tok !== SP.token) return; SP.idx++; spStep(tok); }, S.listen.gap * 1000);
+      });
+    }, S.listen.pause * 1000);
+  });
+}
+function startSpeech() {
+  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") { toast("ההקראה לא נתמכת בדפדפן הזה.", 4000); return; }
+  stopSpeech();
+  SP.list = S.listen.shuf ? shuffle(pool()) : pool(); SP.idx = 0;
+  if (!SP.list.length) return;
+  toast("");
+  SP.on = true; SP.bgSpoken = 0;
+  const tok = ++SP.token;
+  aud.src = silentUrl(); aud.loop = true; // inside the user gesture: start the silent audio first
+  aud.play().catch(() => toast("הדפדפן חסם את האודיו השקט: לחץ שוב על נגן.", 4000));
+  installMediaHandlers();
+  try { navigator.mediaSession.playbackState = "playing"; } catch (e) {}
+  spStep(tok);
+}
+function stopSpeech() {
+  SP.on = false; SP.token++;
+  try { speechSynthesis.cancel(); } catch (e) {}
+  if (S.listen.mode === "speech") aud.pause();
+}
+function spJump(d) {
+  if (!SP.on) return;
+  SP.idx = Math.max(0, SP.idx + d);
+  try { speechSynthesis.cancel(); } catch (e) {}
+  spStep(++SP.token);
+}
+function spKnown() {
+  if (!SP.on || !SP.list[SP.idx]) return;
+  S.known[SP.list[SP.idx].id] = 1; save(); L.stale = true;
+  SP.list.splice(SP.idx, 1);
+  renderTop();
+  try { speechSynthesis.cancel(); } catch (e) {}
+  spStep(++SP.token);
+}
+function updBgLog(msg) {
+  const el = q("bglog");
+  if (el) el.textContent = msg || ("הקראות שהתחילו כשהדף ברקע: " + SP.bgSpoken);
+}
+document.addEventListener("visibilitychange", () => {
+  if (S.listen.mode !== "speech") return;
+  if (document.hidden) { SP.hideAt = Date.now(); SP.bgAtHide = SP.bgSpoken; return; }
+  if (SP.on) { try { speechSynthesis.resume(); } catch (e) {} }
+  if (SP.hideAt && SP.on) {
+    const sec = Math.round((Date.now() - SP.hideAt) / 1000), n = SP.bgSpoken - SP.bgAtHide;
+    updBgLog("הדף היה ברקע " + sec + " שנ' · הוקראו " + n + " הקראות " + (n > 0 ? "✅ ההקראה המשיכה" : "❌ ההקראה נעצרה"));
+  }
+  SP.hideAt = null;
+});
+
 async function runDiag() {
   const el = q("diag");
   el.textContent = "בודק… (בפעם הראשונה מוריד את מנוע ה-TTS)";
@@ -332,17 +437,21 @@ function renderListen() {
   if (!selected().length) { q("main").innerHTML = '<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>'; return; }
   if (!n) { q("main").innerHTML = '<div class="panel empty">אין מילים להאזנה – כולן מסומנות כידועות.</div>'; return; }
   const sel = (k, vals, labels) => '<select class="sel" data-act="lset" data-k="' + k + '">' + vals.map((v, i) => '<option value="' + v + '"' + (+S.listen[k] === v ? " selected" : "") + ">" + labels[i] + "</option>").join("") + "</select>";
-  const w = L.sess && L.idx >= 0 && BYID[L.sess.marks[L.idx].id];
+  const speechMode = S.listen.mode === "speech";
+  const w = speechMode ? (SP.on && SP.list[SP.idx]) : (L.sess && L.idx >= 0 && BYID[L.sess.marks[L.idx].id]);
   const now = w
-    ? '<div class="big he">' + esc(w.he) + '</div><div class="big" dir="ltr" style="margin-top:8px">' + esc(w.en) + '</div><div class="hint">' + (L.idx + 1) + " / " + L.sess.marks.length + "</div>"
+    ? '<div class="big he">' + esc(w.he) + '</div><div class="big" dir="ltr" style="margin-top:8px">' + esc(w.en) + '</div><div class="hint">' + (speechMode ? SP.idx + 1 + " / " + SP.list.length : L.idx + 1 + " / " + L.sess.marks.length) + "</div>"
     : '<div class="hint">' + n + " מילים מוכנות להאזנה<br>לחץ ▶ להתחלה</div>";
-  q("main").innerHTML = '<div class="panel"><p class="lbl">מקריא את כל המילים שעוד לא סימנת כידועות: עברית, הפסקה, אנגלית, ובסוף הרשימה חוזר להתחלה. האודיו הוא קובץ אמיתי, ולכן ממשיך לנגן גם כשהדפדפן ממוזער או המסך כבוי.</p>' +
+  const modeSel = '<select class="sel" data-act="lset" data-k="mode"><option value="speech"' + (speechMode ? " selected" : "") + '>הקראת הדפדפן + אודיו שקט (ניסוי)</option><option value="wav"' + (speechMode ? "" : " selected") + '>קובץ אודיו (קול eSpeak, עובד ברקע)</option></select>';
+  q("main").innerHTML = '<div class="panel"><div class="row" style="margin-bottom:8px"><span class="lbl" style="margin:0">מצב:</span>' + modeSel + '</div><p class="lbl">מקריא את כל המילים שעוד לא סימנת כידועות: עברית, הפסקה, אנגלית, ובסוף הרשימה חוזר להתחלה.</p>' +
     '<div id="lnow" class="card" style="min-height:150px;cursor:default;padding:16px">' + now + "</div>" +
-    '<div class="lbl" id="lprog" style="text-align:center;margin-top:8px">' + esc(L.progress) + "</div>" +
-    '<div class="row c" style="margin-top:6px"><button class="btn" data-act="lprev">⏮</button><button class="btn pri" id="lplay" style="font-size:20px;padding:8px 26px" data-act="lplay">' + (L.building ? "⏳ מכין..." : aud.paused ? "▶ נגן" : "⏸ עצור") + '</button><button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div></div>' +
+    '<div class="lbl" id="lprog" style="text-align:center;margin-top:8px">' + esc(speechMode ? "" : L.progress) + "</div>" +
+    '<div class="lbl" id="bglog" style="text-align:center">' + (speechMode ? "אחרי שתחזור מהרקע יוצג כאן אם ההקראה המשיכה." : "") + "</div>" +
+    '<div class="row c" style="margin-top:6px"><button class="btn" data-act="lprev">⏮</button><button class="btn pri" id="lplay" style="font-size:20px;padding:8px 26px" data-act="lplay">' + (L.building ? "⏳ מכין..." : (speechMode ? !SP.on : aud.paused) ? "▶ נגן" : "⏸ עצור") + '</button><button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div></div>' +
     '<div class="panel"><div class="row" style="gap:12px">' +
     '<label class="lbl" style="margin:0">הפסקה עברית→אנגלית ' + sel("pause", [0.5, 1, 2, 3], ["חצי שנייה", "שנייה", "2 שניות", "3 שניות"]) + "</label>" +
     '<label class="lbl" style="margin:0">בין מילים ' + sel("gap", [1, 2, 3, 5], ["שנייה", "2 שניות", "3 שניות", "5 שניות"]) + "</label>" +
+    (speechMode ? '<label class="lbl" style="margin:0">מהירות ' + sel("rate", [0.7, 0.9, 1.1], ["איטית", "רגילה", "מהירה"]) + "</label>" : "") +
     '<label style="font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" data-act="lset" data-k="shuf"' + (S.listen.shuf ? " checked" : "") + "> ערבוב</label></div>" +
     '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="diag">בדיקת מנוע</button><button class="btn sm" data-act="clearcache">נקה קאש אודיו</button></div><div id="diag"></div></div>';
 }
@@ -384,7 +493,7 @@ function render() {
 document.addEventListener("change", (e) => {
   const t = e.target, a = t.dataset && t.dataset.act;
   if (a === "dir") { S.dir = t.value; save(); resetPractice(); render(); }
-  else if (a === "lset") { S.listen[t.dataset.k] = t.type === "checkbox" ? t.checked : +t.value; save(); L.stale = true; }
+  else if (a === "lset") { const k = t.dataset.k; S.listen[k] = t.type === "checkbox" ? t.checked : k === "mode" ? t.value : +t.value; save(); L.stale = true; if (k === "mode") { stopSpeech(); aud.pause(); render(); } }
   else if (a === "auto") { S.auto = t.checked; save(); if (S.auto) { P.spoken = null; autoSpeak(); } }
 });
 document.addEventListener("click", (e) => {
