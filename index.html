@@ -558,8 +558,10 @@ function renderListen(){
 }
 
 // ---------- events ----------
+var TOUCHED=false;
+["pointerdown","keydown","touchstart"].forEach(function(t){document.addEventListener(t,function(){TOUCHED=true},true)});
 function autoSpeak(){
-  if(!S.auto||["cards","quiz","type"].indexOf(S.tab)<0)return;
+  if(!S.auto||!TOUCHED||["cards","quiz","type"].indexOf(S.tab)<0)return;
   var w=cur();if(!w)return;
   if(!(isEnFront()||P.flip||P.ans!==null||P.fb!==null))return;
   if(P.spoken===w.id)return;
@@ -575,7 +577,7 @@ function speak(id){
     u.lang="en-US";u.rate=.9;
     var vs=speechSynthesis.getVoices()||[];
     var ev=vs.filter(function(x){return /^en/i.test(x.lang)})[0];if(ev)u.voice=ev;
-    u.onerror=function(){if(tt)tt.textContent=NO};
+    u.onerror=function(ev){if(ev&&(ev.error==="interrupted"||ev.error==="canceled"))return;if(tt)tt.textContent=NO};
     speechSynthesis.cancel();speechSynthesis.speak(u);
     setTimeout(function(){if(!speechSynthesis.speaking&&!speechSynthesis.pending&&tt&&!u._ok)tt.textContent=NO},1500);
     u.onstart=function(){u._ok=1;if(tt)tt.textContent=""};
