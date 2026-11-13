@@ -437,6 +437,7 @@ function stopListen(){
   L.on=false;L.token++;
   try{speechSynthesis.cancel()}catch(e){}
   try{if(L.lock){L.lock.release();L.lock=null}}catch(e){}
+  try{if(PIP.v&&!document.pictureInPictureElement){PIP.v.pause();clearInterval(PIP.t)}}catch(e){}
 }
 function lstep(tok){
   if(tok!==L.token||!L.on)return;
@@ -459,7 +460,7 @@ function startListen(){
   if(!("speechSynthesis" in window)||typeof SpeechSynthesisUtterance==="undefined"){tmsg("ההקראה לא נתמכת בדפדפן הזה.");return}
   if(!L.list.length||L.idx>=L.list.length){L.list=buildList();L.idx=0}
   if(!L.list.length){renderListen();return}
-  stopListen();L.on=true;
+  stopListen();L.on=true;setupAutoPip();
   try{if(navigator.wakeLock){navigator.wakeLock.request("screen").then(function(l){L.lock=l},function(){})}}catch(e){}
   renderListen();lstep(L.token);
 }
@@ -498,29 +499,48 @@ function drawPip(){
   g.fillStyle="#9aa1b2";g.font="22px system-ui,Arial";
   g.fillText(w?(L.idx+1)+" / "+L.list.length:"",c.width/2,310);
 }
+var PIPSTAT="";
+function setPipStat(t){PIPSTAT=t;var el=q("pipstat");if(el)el.textContent=t}
+function ensurePip(){
+  if(!PIP.c){
+    PIP.c=document.createElement("canvas");PIP.c.width=640;PIP.c.height=360;
+    var st=PIP.c.captureStream(10);
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext;PIP.ctx=new AC();
+      var o=PIP.ctx.createOscillator(),gn=PIP.ctx.createGain(),d=PIP.ctx.createMediaStreamDestination();
+      o.frequency.value=20;gn.gain.value=0.02;o.connect(gn);gn.connect(d);o.start();
+      st.addTrack(d.stream.getAudioTracks()[0]);
+    }catch(e){}
+    PIP.v=document.createElement("video");PIP.v.playsInline=true;PIP.v.srcObject=st;
+    try{PIP.v.autoPictureInPicture=true}catch(e){}
+    PIP.v.style.cssText="position:fixed;width:2px;height:2px;opacity:0;pointer-events:none";
+    document.body.appendChild(PIP.v);
+    PIP.v.addEventListener("leavepictureinpicture",function(){if(!L.on)clearInterval(PIP.t);setPipStat("החלון הצף נסגר")});
+  }
+  try{if(PIP.ctx)PIP.ctx.resume()}catch(e){}
+  drawPip();clearInterval(PIP.t);PIP.t=setInterval(drawPip,500);
+  return PIP.v.play();
+}
 function startPip(){
   var MSG="לא הצלחתי לפתוח חלון צף כאן. נסה לפתוח את הדף ישירות בכרום, או השתמש בחלון קופץ של סמסונג.";
   if(!document.pictureInPictureEnabled){tmsg(MSG);return}
-  try{
-    if(!PIP.c){
-      PIP.c=document.createElement("canvas");PIP.c.width=640;PIP.c.height=360;
-      var st=PIP.c.captureStream(10);
-      try{
-        var AC=window.AudioContext||window.webkitAudioContext;PIP.ctx=new AC();
-        var o=PIP.ctx.createOscillator(),gn=PIP.ctx.createGain(),d=PIP.ctx.createMediaStreamDestination();
-        gn.gain.value=0.001;o.connect(gn);gn.connect(d);o.start();
-        st.addTrack(d.stream.getAudioTracks()[0]);
-      }catch(e){}
-      PIP.v=document.createElement("video");PIP.v.playsInline=true;PIP.v.srcObject=st;
-      PIP.v.style.cssText="position:fixed;width:2px;height:2px;opacity:0;pointer-events:none";
-      document.body.appendChild(PIP.v);
-      PIP.v.addEventListener("leavepictureinpicture",function(){clearInterval(PIP.t)});
-    }
-    try{if(PIP.ctx)PIP.ctx.resume()}catch(e){}
-    drawPip();clearInterval(PIP.t);PIP.t=setInterval(drawPip,500);
-    PIP.v.play().then(function(){return PIP.v.requestPictureInPicture()}).then(function(){tmsg("")}).catch(function(){tmsg(MSG)});
-  }catch(e){tmsg(MSG)}
+  try{ensurePip().then(function(){return PIP.v.requestPictureInPicture()}).then(function(){tmsg("")}).catch(function(){tmsg(MSG)})}catch(e){tmsg(MSG)}
 }
+// Experiment: let Chrome open the floating window by itself when the page is hidden/minimized while listening
+function setupAutoPip(){
+  if(!document.pictureInPictureEnabled){setPipStat("PiP אוטומטי: לא נתמך בדפדפן הזה");return}
+  try{ensurePip().then(function(){setPipStat("PiP אוטומטי: מוכן. מזער את הכרום ובדוק אם נפתח חלון צף.")},function(){setPipStat("PiP אוטומטי: הוידאו לא התחיל")})}catch(e){}
+  try{
+    navigator.mediaSession.setActionHandler("enterpictureinpicture",function(){
+      return PIP.v.requestPictureInPicture().then(function(){setPipStat("PiP אוטומטי: נפתח אוטומטית ✅")},function(e){setPipStat("PiP אוטומטי: נחסם ("+(e&&e.name||"?")+")")})
+    });
+  }catch(e){setPipStat("PiP אוטומטי: הדפדפן לא תומך בפעולה (צריך כרום 134 ומעלה)")}
+}
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden&&L.on&&PIP.v&&!document.pictureInPictureElement){
+    try{PIP.v.requestPictureInPicture().then(function(){setPipStat("נפתח כשהדף הוסתר ✅")},function(e){setPipStat("ניסיון פתיחה בעת הסתרה נחסם ("+(e&&e.name||"?")+")")})}catch(e){}
+  }
+});
 function renderListen(){
   var n=pool().length;
   if(!selected().length){q("main").innerHTML='<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>';return}
@@ -532,7 +552,7 @@ function renderListen(){
    '<div id="lnow" class="card" style="min-height:150px;cursor:default;padding:16px">'+now+'</div>'+
    '<div class="row c" style="margin-top:10px"><button class="btn" data-act="lprev">⏮</button>'+
    '<button class="btn pri" style="font-size:20px;padding:8px 26px" data-act="lplay">'+(L.on?'⏸ עצור':'▶ נגן')+'</button>'+
-   '<button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div><div class="row c" style="margin-top:8px"><button class="btn sm" data-act="pip">🪟 חלון צף (תמונה בתמונה)</button></div></div>'+
+   '<button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div><div class="row c" style="margin-top:8px"><button class="btn sm" data-act="pip">🪟 חלון צף (תמונה בתמונה)</button></div><div class="lbl" id="pipstat" style="text-align:center;margin-top:6px">'+esc(PIPSTAT)+'</div></div>'+
    '<div class="panel"><div class="row" style="gap:12px">'+
    '<label class="lbl" style="margin:0">הפסקה עברית→אנגלית '+sel("pause",[0.5,1,2,3],["חצי שנייה","שנייה","2 שניות","3 שניות"])+'</label>'+
    '<label class="lbl" style="margin:0">בין מילים '+sel("gap",[1,2,3,5],["שנייה","2 שניות","3 שניות","5 שניות"])+'</label>'+
