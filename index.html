@@ -211,14 +211,14 @@ var LESSONS=[1,2,3,4,5];
 
 // ---------- state ----------
 var KEY="eng-s3-2026-v1";
-var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1},fopen:true,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
+var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1},fopen:false,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
 // state saved by the first GitHub-pages version (same word ids) is carried over once
 function migrateOld(){try{var o=JSON.parse(localStorage.getItem("eng-vocab-trainer-v1")||"null");if(!o)return null;
   return {known:o.known||{},removed:o.removed||{},dir:o.dir,custom:(o.custom||[]).map(function(c){return {id:c.id,sem:"c26",lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||""}})}}catch(e){return null}}
-try{var sv=JSON.parse(localStorage.getItem(KEY)||"null");if(!sv)sv=migrateOld();if(sv){S.known=sv.known||{};S.custom=sv.custom||[];S.removed=sv.removed||{};S.sel=sv.sel||S.sel;
+try{var sv=JSON.parse(localStorage.getItem(KEY)||"null");if(!sv)sv=migrateOld();if(sv){S.known=sv.known||{};S.custom=sv.custom||[];S.removed=sv.removed||{};if(typeof sv.fopen==="boolean")S.fopen=sv.fopen;S.sel=sv.sel||S.sel;
   (function(){var o=S.sel,m={},old=false,k;for(k in o){if(k.indexOf(":")<0)old=true}
   if(old){if(o[5]===undefined)o[5]=1;for(k in o){if(o[k])m["c26:"+k]=1}S.sel=m}})();S.dir=sv.dir||S.dir;S.tab=sv.tab||S.tab;S.auto=!!sv.auto;if(sv.listen){for(var lk in sv.listen)S.listen[lk]=sv.listen[lk]}}}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({known:S.known,custom:S.custom,removed:S.removed,sel:S.sel,dir:S.dir,tab:S.tab,auto:S.auto,listen:S.listen}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({known:S.known,custom:S.custom,removed:S.removed,fopen:S.fopen,sel:S.sel,dir:S.dir,tab:S.tab,auto:S.auto,listen:S.listen}))}catch(e){}}
 function applyUserWords(){
   var ws=BASE_WORDS.filter(function(w){return !S.removed[w.id]});
   S.custom.forEach(function(c){ws.push({id:c.id,sem:c.sem,lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||"",v:false,custom:true})});
@@ -597,7 +597,7 @@ document.addEventListener("click",function(e){
     case"year":toggleKeys(yearKeys(+v));break;
     case"all":allKeys().forEach(function(k){S.sel[k]=1});selChanged();break;
     case"none":S.sel={};selChanged();break;
-    case"fopen":S.fopen=!S.fopen;renderTop();break;
+    case"fopen":S.fopen=!S.fopen;save();renderTop();break;
     case"tab":S.tab=v;save();resetPractice();render();break;
     case"restart":resetPractice();render();break;
     case"flip":P.flip=!P.flip;render();break;
