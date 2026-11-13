@@ -1,0 +1,10 @@
+{
+  "name": "English Vocab Trainer",
+  "short_name": "Vocab",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#12141b",
+  "theme_color": "#12141b",
+  "lang": "he",
+  "dir": "rtl"
+}
