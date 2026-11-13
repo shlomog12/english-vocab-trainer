@@ -437,7 +437,8 @@ function stopListen(){
   L.on=false;L.token++;
   try{speechSynthesis.cancel()}catch(e){}
   try{if(L.lock){L.lock.release();L.lock=null}}catch(e){}
-  try{if(PIP.v&&!document.pictureInPictureElement){PIP.v.pause();clearInterval(PIP.t)}}catch(e){}
+  // pause the hidden video too (even while it is shown in the floating window) so the window offers a Play button again
+  try{if(PIP.v){drawPip();setTimeout(function(){if(!L.on&&PIP.v){try{PIP.v.pause()}catch(e){}clearInterval(PIP.t)}},300)}}catch(e){}
 }
 function lstep(tok){
   if(tok!==L.token||!L.on)return;
@@ -493,7 +494,7 @@ function drawPip(){
   g.fillStyle="#1c1f2a";g.fillRect(0,0,c.width,c.height);
   g.textAlign="center";
   g.direction="rtl";g.fillStyle="#ffffff";g.font="bold 54px system-ui,Arial";
-  g.fillText(w?w.he:"אוצר מילים",c.width/2,150,600);
+  g.fillText(w?w.he:"⏸ מושהה",c.width/2,150,600);
   g.direction="ltr";g.fillStyle="#8b86ff";g.font="bold 44px system-ui,Arial";
   g.fillText(w?w.en:"",c.width/2,240,600);
   g.fillStyle="#9aa1b2";g.font="22px system-ui,Arial";
