@@ -6,7 +6,7 @@ let BASE = [];
 const KEY = "eng-vocab-trainer-v1";
 const S = {
   known: {}, removed: {}, custom: [], sel: {}, dir: "en2he", tab: "cards", auto: false,
-  listen: { pause: 1, gap: 2, shuf: false, mode: "speech", rate: 0.9 }
+  listen: { pause: 1, gap: 2, shuf: false, mode: "speech", rate: 0.9, voiceHe: "", voiceEn: "" }
 };
 try {
   const sv = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -334,14 +334,21 @@ function silentUrl() {
   }
   return SP.url;
 }
+function voicesFor(lang) {
+  const pre = lang === "he" ? ["he", "iw"] : ["en"];
+  return (window.speechSynthesis ? speechSynthesis.getVoices() || [] : []).filter((x) => pre.some((p) => (x.lang || "").toLowerCase().indexOf(p) === 0));
+}
+function pickVoice(lang) {
+  const list = voicesFor(lang), saved = lang === "he" ? S.listen.voiceHe : S.listen.voiceEn;
+  return list.filter((x) => x.name === saved)[0] || list[0];
+}
 function sayText(text, lang, cb) {
   let done = false, t;
   const fin = () => { if (done) return; done = true; clearTimeout(t); cb(); };
   try {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang === "he" ? "he-IL" : "en-US"; u.rate = +S.listen.rate || 0.9;
-    const pre = lang === "he" ? ["he", "iw"] : ["en"];
-    const v = (speechSynthesis.getVoices() || []).filter((x) => pre.some((p) => (x.lang || "").toLowerCase().indexOf(p) === 0))[0];
+    const v = pickVoice(lang);
     if (v) u.voice = v;
     u.onstart = () => { if (document.hidden) { SP.bgSpoken++; updBgLog(); } };
     u.onend = fin; u.onerror = fin;
@@ -432,6 +439,15 @@ async function runDiag() {
     el.textContent = "❌ " + (e && e.stack ? e.stack : e);
   }
 }
+function voicePicker() {
+  const one = (lang, key, label) => {
+    const list = voicesFor(lang), cur = (pickVoice(lang) || {}).name;
+    const opts = list.length ? list.map((x) => '<option value="' + esc(x.name) + '"' + (x.name === cur ? " selected" : "") + ">" + esc(x.name) + " (" + esc(x.lang) + (x.localService ? "" : ", רשת") + ")</option>").join("") : "<option>אין קולות במכשיר</option>";
+    return '<div class="row" style="margin-top:8px"><span class="lbl" style="margin:0;min-width:46px">' + label + '</span><select class="sel" style="flex:1;min-width:0" data-act="lset" data-k="' + key + '">' + opts + '</select><button class="btn sm" data-act="vtest" data-v="' + lang + '">🔊</button></div>';
+  };
+  return '<p class="lbl" style="margin-top:12px">קולות (אם הקול נשמע רובוטי, נסה קול אחר מהרשימה; קולות "רשת" הם בדרך כלל הטובים ביותר):</p>' + one("en", "voiceEn", "English") + one("he", "voiceHe", "עברית");
+}
+if ("speechSynthesis" in window && typeof speechSynthesis.addEventListener === "function") speechSynthesis.addEventListener("voiceschanged", () => { if (S.tab === "listen" && !SP.on) render(); });
 function renderListen() {
   const n = pool().length;
   if (!selected().length) { q("main").innerHTML = '<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>'; return; }
@@ -453,6 +469,7 @@ function renderListen() {
     '<label class="lbl" style="margin:0">בין מילים ' + sel("gap", [1, 2, 3, 5], ["שנייה", "2 שניות", "3 שניות", "5 שניות"]) + "</label>" +
     (speechMode ? '<label class="lbl" style="margin:0">מהירות ' + sel("rate", [0.7, 0.9, 1.1], ["איטית", "רגילה", "מהירה"]) + "</label>" : "") +
     '<label style="font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" data-act="lset" data-k="shuf"' + (S.listen.shuf ? " checked" : "") + "> ערבוב</label></div>" +
+    (speechMode ? voicePicker() : "") +
     '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="diag">בדיקת מנוע</button><button class="btn sm" data-act="clearcache">נקה קאש אודיו</button></div><div id="diag"></div></div>';
 }
 
@@ -493,7 +510,7 @@ function render() {
 document.addEventListener("change", (e) => {
   const t = e.target, a = t.dataset && t.dataset.act;
   if (a === "dir") { S.dir = t.value; save(); resetPractice(); render(); }
-  else if (a === "lset") { const k = t.dataset.k; S.listen[k] = t.type === "checkbox" ? t.checked : k === "mode" ? t.value : +t.value; save(); L.stale = true; if (k === "mode") { stopSpeech(); aud.pause(); render(); } }
+  else if (a === "lset") { const k = t.dataset.k; S.listen[k] = t.type === "checkbox" ? t.checked : (k === "mode" || k === "voiceHe" || k === "voiceEn") ? t.value : +t.value; save(); L.stale = true; if (k === "mode") { stopSpeech(); aud.pause(); render(); } }
   else if (a === "auto") { S.auto = t.checked; save(); if (S.auto) { P.spoken = null; autoSpeak(); } }
 });
 document.addEventListener("click", (e) => {
@@ -514,6 +531,7 @@ document.addEventListener("click", (e) => {
     case "lnext": jump(1); break;
     case "lknown": listenKnown(); break;
     case "diag": runDiag(); break;
+    case "vtest": try { speechSynthesis.cancel(); } catch (err) {} sayText(v === "he" ? "שלום, זה בדיקה של הקול" : "Hello, this is a test of the voice", v, () => {}); break;
     case "clearcache": clearCache().then(() => { L.stale = true; toast("הקאש נוקה", 2000); }); break;
     case "skip": next(); break;
     case "back": if (P.i > 0) { P.i--; P.flip = false; P.ans = null; P.fb = null; P.spoken = null; makeOpts(); render(); } break;
