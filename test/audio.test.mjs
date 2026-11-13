@@ -41,4 +41,25 @@ assert.equal(markIndexAt(s.marks, 0), 0);
 assert.equal(markIndexAt(s.marks, s.marks[1].start + 0.01), 1);
 assert.equal(markIndexAt(s.marks, s.duration - 0.01), 2);
 
+// 6. float32 WAV (what some neural TTS libraries emit) is converted to 16-bit
+{
+  const n = 400, buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf);
+  const w4 = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w4(0, "RIFF"); v.setUint32(4, 36 + n * 4, true); w4(8, "WAVE"); w4(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 3, true); v.setUint16(22, 1, true); v.setUint32(24, 24000, true); v.setUint32(28, 96000, true); v.setUint16(32, 4, true); v.setUint16(34, 32, true);
+  w4(36, "data"); v.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) v.setFloat32(44 + i * 4, i % 2 ? 0.5 : -0.5, true);
+  const f = parseWav(new Uint8Array(buf));
+  assert.equal(f.rate, 24000); assert.equal(f.samples.length, n);
+  assert.ok(Math.abs(f.samples[1] - 16384) <= 1 && Math.abs(f.samples[0] + 16384) <= 1);
+}
+
+// 7. English-only session (no cleanHe): one clip + gap per word
+{
+  const s2 = await buildSession(fakeWav, words, { pause: 1, gap: 2, cleanEn: (x) => x });
+  assert.equal(s2.marks.length, 3);
+  const first = s2.marks[0].end - s2.marks[0].start;
+  assert.ok(first > 2 && first < 2 + 0.7, "english-only length " + first);
+}
+
 console.log("audio tests passed; session", s.duration.toFixed(1) + "s,", (s.wav.byteLength / 1024).toFixed(0) + "KB");

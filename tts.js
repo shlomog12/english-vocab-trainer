@@ -81,15 +81,58 @@ export async function cacheSize() {
   try { const d = await db(); return await new Promise((res) => { const q = d.transaction("wav").objectStore("wav").count(); q.onsuccess = () => res(q.result); q.onerror = () => res(0); }); } catch (e) { return 0; }
 }
 
-let chain = Promise.resolve(); // espeak is not re-entrant: serialise calls
+// ---- Kokoro (natural-sounding English, runs locally via transformers.js) ----
+const KOKORO_URL = "https://esm.sh/kokoro-js@1.2.1";
+const KOKORO_MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
+let kokoroPromise = null;
+let statusHandler = null;
+export function setStatusHandler(fn) { statusHandler = fn; }
+function loadKokoro() {
+  if (!kokoroPromise) {
+    kokoroPromise = (async () => {
+      if (statusHandler) statusHandler("טוען את מנוע הקול…");
+      const { KokoroTTS } = await import(KOKORO_URL);
+      return KokoroTTS.from_pretrained(KOKORO_MODEL, {
+        dtype: "q8", device: "wasm",
+        progress_callback: (p) => {
+          if (statusHandler && p && p.status === "progress" && typeof p.progress === "number") statusHandler("מוריד מודל קול (חד פעמי): " + Math.round(p.progress) + "%");
+        }
+      });
+    })().catch((e) => { kokoroPromise = null; throw e; });
+  }
+  return kokoroPromise;
+}
+function floatToWav(f32, rate) {
+  const n = f32.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.max(-1, Math.min(1, f32[i])) * 32767), true);
+  return new Uint8Array(buf);
+}
+async function runKokoro(text, voice) {
+  const tts = await loadKokoro();
+  const out = await tts.generate(text, { voice });
+  if (out && out.audio && out.sampling_rate) return floatToWav(out.audio, out.sampling_rate);
+  if (out && typeof out.toWav === "function") return new Uint8Array(out.toWav()); // audio.js also reads float32 WAVs
+  throw new Error("unexpected Kokoro output");
+}
 
-/** Returns WAV bytes (Uint8Array) for text in lang ("he" | "en"). Cached. */
-export function getWav(text, lang) {
-  const key = lang + "|" + SPEED + "|" + text;
+let chain = Promise.resolve(); // the engines are not re-entrant: serialise calls
+
+/**
+ * Returns WAV bytes (Uint8Array) for text in lang ("he" | "en"). Cached.
+ * opts: { enEngine: "kokoro" | "espeak", kvoice: "af_heart" }
+ */
+export function getWav(text, lang, opts = {}) {
+  const useKokoro = lang === "en" && opts.enEngine === "kokoro";
+  const kvoice = opts.kvoice || "af_heart";
+  const key = useKokoro ? "en|kokoro|" + kvoice + "|" + text : lang + "|" + SPEED + "|" + text;
   const job = chain.then(async () => {
     const hit = await idbGet(key);
     if (hit) return new Uint8Array(hit);
-    const bytes = await runEspeak(text, VOICES[lang]);
+    const bytes = useKokoro ? await runKokoro(text, kvoice) : await runEspeak(text, VOICES[lang]);
     const copy = new Uint8Array(bytes); // detach from the wasm heap
     await idbPut(key, copy.buffer.slice(0));
     return copy;
@@ -99,9 +142,10 @@ export function getWav(text, lang) {
 }
 
 /** Quick self-test used by the "בדיקת מנוע" button. */
-export async function selfTest() {
+export async function selfTest(opts = {}) {
   const t0 = performance.now();
-  const he = await getWav("שלום", "he");
-  const en = await getWav("hello", "en");
-  return { heBytes: he.length, enBytes: en.length, ms: Math.round(performance.now() - t0), entry: engineInfo.entry, mode: engineInfo.mode };
+  const en = await getWav("hello", "en", opts);
+  let heBytes = null;
+  if (opts.testHebrew) heBytes = (await getWav("שלום", "he")).length;
+  return { heBytes, enBytes: en.length, ms: Math.round(performance.now() - t0), entry: engineInfo.entry, mode: engineInfo.mode };
 }

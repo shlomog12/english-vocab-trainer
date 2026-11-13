@@ -6,12 +6,13 @@ export function parseWav(bytes) {
   const v = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   const tag = (o) => String.fromCharCode(u8[o], u8[o + 1], u8[o + 2], u8[o + 3]);
   if (u8.length < 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE") throw new Error("not a WAV file");
-  let pos = 12, rate = 0, channels = 1, bits = 16, dataStart = -1, dataLen = 0;
+  let pos = 12, rate = 0, channels = 1, bits = 16, fmtTag = 1, dataStart = -1, dataLen = 0;
   while (pos + 8 <= u8.length) {
     const id = tag(pos);
     let size = v.getUint32(pos + 4, true);
     const body = pos + 8;
     if (id === "fmt ") {
+      fmtTag = v.getUint16(body, true);
       channels = v.getUint16(body + 2, true);
       rate = v.getUint32(body + 4, true);
       bits = v.getUint16(body + 14, true);
@@ -25,12 +26,17 @@ export function parseWav(bytes) {
     pos = body + size + (size & 1);
   }
   if (dataStart < 0) throw new Error("WAV has no data chunk");
-  if (bits !== 16) throw new Error("only 16-bit WAV is supported (got " + bits + ")");
-  const frames = Math.floor(dataLen / (2 * channels));
+  const float32 = fmtTag === 3 && bits === 32;
+  if (bits !== 16 && !float32) throw new Error("unsupported WAV format (tag " + fmtTag + ", " + bits + " bit)");
+  const width = float32 ? 4 : 2;
+  const frames = Math.floor(dataLen / (width * channels));
   const out = new Int16Array(frames);
   for (let i = 0; i < frames; i++) {
     let sum = 0;
-    for (let c = 0; c < channels; c++) sum += v.getInt16(dataStart + (i * channels + c) * 2, true);
+    for (let c = 0; c < channels; c++) {
+      const o = dataStart + (i * channels + c) * width;
+      sum += float32 ? Math.max(-1, Math.min(1, v.getFloat32(o, true))) * 32767 : v.getInt16(o, true);
+    }
     out[i] = Math.round(sum / channels);
   }
   return { rate, samples: out };
@@ -76,7 +82,7 @@ export function trim(samples, rate) {
  *
  * getWav(text, lang) -> Promise<Uint8Array|ArrayBuffer>   (WAV bytes for that text)
  * words: [{id, he, en}]
- * opts: { pause, gap, cleanHe, cleanEn, rate? }  (pause/gap in seconds)
+ * opts: { pause, gap, cleanHe (omit to skip Hebrew), cleanEn, rate? }  (pause/gap in seconds)
  * Returns { wav: ArrayBuffer, marks: [{id, start, end}], rate, duration }
  */
 export async function buildSession(getWav, words, opts, onProgress) {
@@ -88,13 +94,15 @@ export async function buildSession(getWav, words, opts, onProgress) {
     const w = words[i];
     if (onProgress) onProgress(i, words.length);
     const parts = [];
-    for (const [text, lang] of [[opts.cleanHe(w.he), "he"], [opts.cleanEn(w.en), "en"]]) {
+    const jobs = opts.cleanHe ? [[opts.cleanHe(w.he), "he"], [opts.cleanEn(w.en), "en"]] : [[opts.cleanEn(w.en), "en"]];
+    for (const [text, lang] of jobs) {
       const p = parseWav(await getWav(text, lang));
       if (!rate) rate = p.rate;
       parts.push(trim(resample(p.samples, p.rate, rate), rate));
     }
     const start = total;
-    const seq = [parts[0], silence(opts.pause), parts[1], silence(opts.gap)];
+    // Hebrew (optional) -> pause -> English -> gap.  Without Hebrew: English -> gap.
+    const seq = opts.cleanHe ? [parts[0], silence(opts.pause), parts[1], silence(opts.gap)] : [parts[0], silence(opts.gap)];
     for (const a of seq) { pieces.push(a); total += a.length; }
     marks.push({ id: w.id, start: start / rate, end: total / rate });
   }
