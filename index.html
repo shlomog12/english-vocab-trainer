@@ -3,107 +3,86 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>בדיקת נגינה ברקע</title>
+<title>אוצר מילים באנגלית</title>
 <link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12141b">
 <style>
-  body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;margin:0;padding:16px;background:#12141b;color:#eceef5;line-height:1.5}
-  h1{font-size:20px;margin:0 0 4px}
-  p{color:#9aa1b2;font-size:14px;margin:4px 0 12px}
-  .box{background:#1c1f2a;border:1px solid #2c3040;border-radius:14px;padding:14px;margin-bottom:14px}
-  button{font:inherit;font-size:16px;padding:12px 18px;border-radius:12px;border:0;background:#4f46e5;color:#fff;margin:4px 4px 4px 0}
-  button.alt{background:#2c3040}
-  #log{font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:pre-wrap;direction:ltr;text-align:left;max-height:260px;overflow:auto}
-  #clock{font-size:28px;font-weight:700;direction:ltr;text-align:center}
+:root{--bg:#f6f7fb;--card:#fff;--ink:#1b1f2a;--mute:#6b7280;--line:#e3e6ee;--acc:#4f46e5;--acc2:#eef0ff;--ok:#16a34a;--okbg:#e8f8ee;--bad:#dc2626;--badbg:#fdeaea}
+@media(prefers-color-scheme:dark){:root{--bg:#12141b;--card:#1c1f2a;--ink:#eceef5;--mute:#9aa1b2;--line:#2c3040;--acc:#8b86ff;--acc2:#262a47;--ok:#4ade80;--okbg:#17301f;--bad:#f87171;--badbg:#3a1c1c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 80px}
+h1{font-size:20px;margin:6px 0 2px}
+.sub{color:var(--mute);font-size:13px;margin-bottom:12px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip,.btn,.tab{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 13px;cursor:pointer;font-size:14px}
+.chip.on,.tab.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip.link{border-style:dashed;color:var(--acc)}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.tab{white-space:nowrap;border-radius:10px}
+.lbl{font-size:12px;color:var(--mute);margin:0 0 6px}
+.stats{display:flex;gap:14px;font-size:13px;color:var(--mute);flex-wrap:wrap;margin-top:10px}
+.stats b{color:var(--ink)}
+.bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.btn{border-radius:10px}
+.btn[disabled]{opacity:.45}
+.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.danger{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn.sm{padding:4px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.c{justify-content:center}
+.card{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 16px;cursor:pointer;user-select:none}
+.big{font-size:30px;font-weight:700;word-break:break-word}
+.big.he{font-size:28px}
+.ex{color:var(--mute);font-size:15px;margin-top:12px;direction:ltr;font-style:italic}
+.hint{color:var(--mute);font-size:12px;margin-top:14px}
+.tag{font-size:11px;color:var(--acc);background:var(--acc2);border-radius:6px;padding:2px 7px;margin-bottom:12px}
+.opts{display:grid;gap:8px;margin-top:14px}
+.opt{font:inherit;text-align:center;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:16px}
+.opt.right{background:var(--okbg);border-color:var(--ok)}
+.opt.wrong{background:var(--badbg);border-color:var(--bad)}
+input[type=text],input[type=number],textarea{font:inherit;width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:17px}
+textarea{font-size:13px;min-height:90px;direction:ltr}
+.fb{margin-top:10px;padding:10px;border-radius:10px;font-size:15px}
+.fb.ok{background:var(--okbg);color:var(--ok)}.fb.bad{background:var(--badbg);color:var(--bad)}
+.list{display:flex;flex-direction:column}
+.item{display:flex;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .t{flex:1;min-width:0}
+.item .en{font-weight:600;direction:ltr;text-align:right}
+.item .he{color:var(--mute);font-size:14px}
+.item.known .en,.item.known .he{text-decoration:line-through;opacity:.55}
+.ltag{font-size:11px;color:var(--mute);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.empty{text-align:center;color:var(--mute);padding:30px 10px}
+.spk{background:none;border:0;font-size:20px;cursor:pointer;color:var(--acc)}
+.sel{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.form{display:grid;gap:8px}
+.form .two{display:grid;grid-template-columns:90px 1fr;gap:8px}
+#toast{position:fixed;left:10px;right:10px;bottom:10px;text-align:center;font-size:14px;color:var(--bad);background:var(--badbg);border-radius:10px;padding:8px 10px}
+#toast:empty{display:none}
+#diag{font-family:ui-monospace,Menlo,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap;color:var(--mute);margin-top:8px}
 </style>
 </head>
 <body>
-<h1>🎧 בדיקת נגינה ברקע</h1>
-<p>לחץ נגן, נעל את המסך או מזער את הדפדפן, חכה דקה-שתיים, וחזור. הלוג למטה יראה אם הנגינה המשיכה.</p>
+<div class="wrap">
+  <h1>📚 אוצר מילים באנגלית</h1>
+  <div class="sub">בחר שיעורים, תרגל, וסמן מילים שאתה כבר יודע כדי שלא יופיעו שוב.</div>
 
-<div class="box">
-  <b>בדיקה A: &lt;audio&gt; אמיתי (צפצוף כל 5 שניות)</b>
-  <div id="clock">0:00</div>
-  <button id="playA">▶ נגן A</button>
-  <button id="stopA" class="alt">⏹ עצור</button>
+  <div class="panel">
+    <p class="lbl">שיעורים לתרגול (אפשר לבחור כמה)</p>
+    <div class="chips" id="lessons"></div>
+    <div class="stats" id="stats"></div>
+    <div class="bar"><i id="barfill" style="width:0"></i></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="main"></div>
+  <div id="toast"></div>
 </div>
-
-<div class="box">
-  <b>בדיקה B: הקראה (speechSynthesis) סופרת מספרים</b>
-  <p>זו השיטה שבה האפליקציה משתמשת היום. להשוואה.</p>
-  <button id="playB">▶ נגן B</button>
-  <button id="stopB" class="alt">⏹ עצור</button>
-</div>
-
-<div class="box">
-  <b>לוג</b>
-  <div id="log"></div>
-</div>
-
 <audio id="aud" loop playsinline></audio>
-
-<script>
-(function(){
-  var logEl=document.getElementById("log"),clock=document.getElementById("clock"),aud=document.getElementById("aud");
-  function log(m){var t=new Date().toLocaleTimeString("he-IL");logEl.textContent=t+"  "+m+"\n"+logEl.textContent}
-
-  // ---- build a WAV blob: 5 minutes, 8kHz mono, a 0.3s beep every 5s (pitch rises each beep) ----
-  function makeWav(){
-    var rate=8000,secs=300,n=rate*secs,buf=new ArrayBuffer(44+n*2),v=new DataView(buf);
-    function s(o,t){for(var i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i))}
-    s(0,"RIFF");v.setUint32(4,36+n*2,true);s(8,"WAVE");s(12,"fmt ");v.setUint32(16,16,true);
-    v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);
-    v.setUint16(32,2,true);v.setUint16(34,16,true);s(36,"data");v.setUint32(40,n*2,true);
-    for(var i=0;i<n;i++){
-      var sec=i/rate,inBeep=(sec%5)<0.3,x=0;
-      if(inBeep){var k=Math.floor(sec/5)%6;var f=440+k*110;var env=Math.min(1,(sec%5)*30,(0.3-(sec%5))*30);x=Math.sin(2*Math.PI*f*sec)*0.5*env}
-      v.setInt16(44+i*2,x*32767,true);
-    }
-    return new Blob([buf],{type:"audio/wav"});
-  }
-
-  var url=null;
-  function setupMedia(){
-    if(!("mediaSession" in navigator))return;
-    navigator.mediaSession.metadata=new MediaMetadata({title:"בדיקת רקע",artist:"english-vocab-trainer"});
-    navigator.mediaSession.setActionHandler("play",function(){aud.play()});
-    navigator.mediaSession.setActionHandler("pause",function(){aud.pause()});
-  }
-  function fmt(t){t=Math.floor(t);return Math.floor(t/60)+":"+("0"+t%60).slice(-2)}
-
-  document.getElementById("playA").onclick=function(){
-    if(!url){url=URL.createObjectURL(makeWav());aud.src=url}
-    setupMedia();
-    aud.play().then(function(){log("A: התחיל לנגן")},function(e){log("A: שגיאה "+e.message)});
-  };
-  document.getElementById("stopA").onclick=function(){aud.pause();aud.currentTime=0;log("A: נעצר")};
-  aud.addEventListener("timeupdate",function(){clock.textContent=fmt(aud.currentTime)});
-  aud.addEventListener("pause",function(){log("A: pause event (t="+fmt(aud.currentTime)+")")});
-  aud.addEventListener("play",function(){log("A: play event")});
-
-  // ---- test B: speech synthesis counter ----
-  var bOn=false,bN=0,bTimer=null;
-  function sayNext(){
-    if(!bOn)return;
-    bN++;
-    try{var u=new SpeechSynthesisUtterance(String(bN));u.lang="en-US";speechSynthesis.speak(u);log("B: אמר "+bN)}catch(e){log("B: שגיאה")}
-    bTimer=setTimeout(sayNext,5000);
-  }
-  document.getElementById("playB").onclick=function(){bOn=true;bN=0;log("B: התחיל");sayNext()};
-  document.getElementById("stopB").onclick=function(){bOn=false;clearTimeout(bTimer);try{speechSynthesis.cancel()}catch(e){};log("B: נעצר")};
-
-  // ---- visibility: show whether audio advanced while hidden ----
-  var hiddenAt=null,tAtHide=0;
-  document.addEventListener("visibilitychange",function(){
-    if(document.hidden){hiddenAt=Date.now();tAtHide=aud.currentTime;log("הדף ירד לרקע")}
-    else if(hiddenAt){
-      var wall=(Date.now()-hiddenAt)/1000,adv=aud.currentTime-tAtHide;
-      if(adv<0)adv+=300;
-      log("חזרה: עברו "+wall.toFixed(0)+" שנ', אודיו התקדם "+adv.toFixed(0)+" שנ' "+(aud.paused?"(מושהה!)":(adv>wall*0.8?"✅ המשיך ברקע":"❌ לא המשיך")));
-      hiddenAt=null;
-    }
-  });
-  log("מוכן");
-})();
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

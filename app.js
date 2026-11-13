@@ -1,0 +1,457 @@
+import { buildSession, markIndexAt } from "./audio.js";
+import { getWav, selfTest, clearCache, cacheSize } from "./tts.js";
+
+// ---------- words ----------
+let BASE = [];
+const KEY = "eng-vocab-trainer-v1";
+const S = {
+  known: {}, removed: {}, custom: [], sel: {}, dir: "en2he", tab: "cards", auto: false,
+  listen: { pause: 1, gap: 2, shuf: false }
+};
+try {
+  const sv = JSON.parse(localStorage.getItem(KEY) || "null");
+  if (sv) {
+    S.known = sv.known || {}; S.removed = sv.removed || {}; S.custom = sv.custom || [];
+    S.sel = sv.sel || {}; S.dir = sv.dir || S.dir; S.tab = sv.tab || S.tab; S.auto = !!sv.auto;
+    if (sv.listen) Object.assign(S.listen, sv.listen);
+  }
+} catch (e) {}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+}
+
+let WORDS = [], BYID = {};
+function rebuildWords() {
+  const base = BASE.map((r) => ({ id: r.lesson + ":" + r.en, lesson: r.lesson, en: r.en, he: r.he, ex: r.ex || "", v: !!r.v, custom: false }));
+  const custom = S.custom.map((r) => ({ id: r.id, lesson: r.lesson, en: r.en, he: r.he, ex: r.ex || "", v: false, custom: true }));
+  WORDS = base.filter((w) => !S.removed[w.id]).concat(custom);
+  BYID = {};
+  WORDS.forEach((w) => { BYID[w.id] = w; });
+}
+function lessons() {
+  const set = {};
+  WORDS.forEach((w) => { set[w.lesson] = 1; });
+  return Object.keys(set).map(Number).sort((a, b) => a - b);
+}
+const lessonOn = (l) => S.sel[l] !== 0;
+const selected = () => WORDS.filter((w) => lessonOn(w.lesson));
+const pool = () => selected().filter((w) => !S.known[w.id]);
+
+// ---------- helpers ----------
+const q = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function shuffle(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+let toastTimer = null;
+function toast(m, ms) {
+  q("toast").textContent = m || "";
+  clearTimeout(toastTimer);
+  if (m && ms) toastTimer = setTimeout(() => { q("toast").textContent = ""; }, ms);
+}
+const front = (w) => (S.dir === "en2he" ? w.en : w.he);
+const back = (w) => (S.dir === "en2he" ? w.he : w.en);
+const isEnFront = () => S.dir === "en2he";
+
+// ---------- practice state ----------
+const P = { queue: [], i: 0, flip: false, ans: null, fb: null, score: { ok: 0, bad: 0 }, opts: [], msg: "", spoken: null };
+function resetPractice() {
+  P.queue = shuffle(pool()).map((w) => w.id);
+  P.i = 0; P.flip = false; P.ans = null; P.fb = null; P.score = { ok: 0, bad: 0 }; P.msg = ""; P.spoken = null;
+  makeOpts();
+}
+const cur = () => BYID[P.queue[P.i]];
+function makeOpts() {
+  const w = cur();
+  P.opts = []; P.ans = null;
+  if (!w) return;
+  const correct = back(w);
+  const others = shuffle(WORDS.filter((x) => back(x) !== correct)).slice(0, 3).map(back);
+  P.opts = shuffle(others.concat([correct]));
+}
+function next() { P.i++; P.flip = false; P.ans = null; P.fb = null; makeOpts(); render(); }
+function markKnown(id) {
+  S.known[id] = 1; save();
+  const k = P.queue.indexOf(id);
+  if (k >= 0) { P.queue.splice(k, 1); if (k < P.i) P.i--; }
+  P.flip = false; P.ans = null; P.fb = null; makeOpts(); render();
+}
+
+// ---------- rendering ----------
+function renderTop() {
+  q("lessons").innerHTML = lessons().map((l) => '<button class="chip' + (lessonOn(l) ? " on" : "") + '" data-act="lesson" data-v="' + l + '">שיעור ' + l + "</button>").join("") +
+    '<button class="chip link" data-act="all">הכל</button><button class="chip link" data-act="none">נקה</button>';
+  const sel = selected(), kn = sel.filter((w) => S.known[w.id]).length;
+  q("stats").innerHTML = "<span>נבחרו: <b>" + sel.length + "</b></span><span>ידועות: <b>" + kn + "</b></span><span>לתרגול: <b>" + (sel.length - kn) + "</b></span>";
+  q("barfill").style.width = (sel.length ? Math.round((kn / sel.length) * 100) : 0) + "%";
+  const knownCount = Object.keys(S.known).filter((k) => BYID[k]).length;
+  const tabs = [["cards", "כרטיסיות"], ["quiz", "בחירה"], ["type", "הקלדה"], ["listen", "🎧 האזנה"], ["list", "רשימה / ניהול"], ["known", "ידועות (" + knownCount + ")"]];
+  q("tabs").innerHTML = tabs.map((t) => '<button class="tab' + (S.tab === t[0] ? " on" : "") + '" data-act="tab" data-v="' + t[0] + '">' + t[1] + "</button>").join("");
+}
+function dirBar() {
+  return '<div class="row" style="margin-bottom:10px"><span class="lbl" style="margin:0">כיוון:</span><select class="sel" data-act="dir"><option value="en2he"' + (S.dir === "en2he" ? " selected" : "") + '>אנגלית ← עברית</option><option value="he2en"' + (S.dir === "he2en" ? " selected" : "") + '>עברית ← אנגלית</option></select><button class="btn sm" data-act="restart">ערבב מחדש</button><label style="font-size:13px;display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-act="auto"' + (S.auto ? " checked" : "") + "> הקראה אוטומטית</label></div>";
+}
+function wordHTML(text, en) {
+  return '<div class="big' + (en ? "" : " he") + '" dir="' + (en ? "ltr" : "rtl") + '">' + esc(text) + (en ? ' <button class="spk" data-act="speak" title="הקרא">🔊</button>' : "") + "</div>";
+}
+function doneHTML() {
+  const n = pool().length;
+  if (!selected().length) return '<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>';
+  if (!n) return '<div class="panel empty">🎉 אין מילים לתרגול – כל המילים בשיעורים שנבחרו מסומנות כידועות.<br><br><button class="btn pri" data-act="tab" data-v="known">לרשימת הידועות</button></div>';
+  return '<div class="panel empty">🎉 סיימת סבב!' + (P.score.ok + P.score.bad ? "<br>נכון: " + P.score.ok + " · שגוי: " + P.score.bad : "") + '<br><br><button class="btn pri" data-act="restart">סבב חדש</button></div>';
+}
+function progress() {
+  return '<div class="row" style="justify-content:space-between;margin-bottom:6px"><button class="btn sm" data-act="back"' + (P.i > 0 ? "" : " disabled") + '>→ הקודם</button><span class="lbl" style="margin:0">' + (P.i + 1) + " / " + P.queue.length + '</span><span style="width:70px"></span></div>';
+}
+function renderCards() {
+  const w = cur(); let h = dirBar();
+  if (!w) { q("main").innerHTML = h + doneHTML(); return; }
+  const f = isEnFront();
+  const body = P.flip
+    ? '<span class="tag">' + (f ? "עברית" : "English") + "</span>" + wordHTML(back(w), !f) + (w.ex ? '<div class="ex">' + esc(w.ex) + "</div>" : "")
+    : '<span class="tag">' + (f ? "English" : "עברית") + "</span>" + wordHTML(front(w), f) + '<div class="hint">לחץ להיפוך</div>';
+  h += progress() + '<div class="panel card" data-act="flip">' + body + '</div><div class="row c"><button class="btn" data-act="skip">עוד לא ↩</button><button class="btn ok" data-act="know">ידוע ✓</button></div>';
+  q("main").innerHTML = h;
+}
+function renderQuiz() {
+  const w = cur(); let h = dirBar();
+  if (!w) { q("main").innerHTML = h + doneHTML(); return; }
+  const f = isEnFront(), correct = back(w);
+  h += progress() + '<div class="panel" style="text-align:center"><span class="tag">' + (f ? "מה פירוש המילה?" : "איך אומרים באנגלית?") + "</span>" + wordHTML(front(w), f) +
+    '<div class="opts">' + P.opts.map((o, i) => {
+      let c = "opt";
+      if (P.ans !== null) { if (o === correct) c += " right"; else if (i === P.ans) c += " wrong"; }
+      return '<button class="' + c + '" data-act="opt" data-v="' + i + '" dir="' + (f ? "rtl" : "ltr") + '">' + esc(o) + "</button>";
+    }).join("") + "</div>";
+  if (P.ans !== null) h += (w.ex ? '<div class="ex">' + esc(w.ex) + "</div>" : "") + '<div class="row c" style="margin-top:14px"><button class="btn ok" data-act="know">ידוע ✓</button><button class="btn pri" data-act="skip">הבא ←</button></div>';
+  h += "</div>";
+  q("main").innerHTML = h;
+}
+function renderType() {
+  const w = cur(); let h = dirBar();
+  if (!w) { q("main").innerHTML = h + doneHTML(); return; }
+  const f = isEnFront();
+  h += progress() + '<div class="panel" style="text-align:center"><span class="tag">' + (f ? "כתוב בעברית" : "Type in English") + "</span>" + wordHTML(front(w), f);
+  if (P.fb === null) {
+    h += '<div style="margin-top:16px"><input type="text" id="ans" autocomplete="off" autocapitalize="off" dir="' + (f ? "rtl" : "ltr") + '" placeholder="' + (f ? "התשובה..." : "Answer...") + '"></div><div class="row c" style="margin-top:12px"><button class="btn" data-act="reveal">הצג תשובה</button><button class="btn pri" data-act="check">בדוק</button></div>';
+  } else {
+    h += '<div class="fb ' + (P.fb.ok ? "ok" : "bad") + '">' + (P.fb.ok ? "✓ נכון!" : "✗ התשובה: ") + (P.fb.ok ? "" : '<span dir="' + (f ? "rtl" : "ltr") + '"><b>' + esc(back(w)) + "</b></span>") + "</div>" +
+      (w.ex ? '<div class="ex">' + esc(w.ex) + "</div>" : "") + '<div class="row c" style="margin-top:14px"><button class="btn ok" data-act="know">ידוע ✓</button><button class="btn pri" data-act="skip">הבא ←</button></div>';
+  }
+  h += "</div>";
+  q("main").innerHTML = h;
+  const inp = q("ans");
+  if (inp) { inp.focus(); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") checkType(); }); }
+}
+const norm = (s) => s.toLowerCase().replace(/\(.*?\)/g, "").replace(/[.,!?'"׳״]/g, "").replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+function variants(w) {
+  const t = back(w), vs = [t];
+  t.split(/\s*\/\s*/).forEach((x) => vs.push(x));
+  if (w.v && !isEnFront()) vs.push(t.split(/\s*[–-]\s*/)[0]);
+  if (!isEnFront()) vs.push(t.replace(/^to /i, ""));
+  return vs.map(norm).filter(Boolean);
+}
+function checkType() {
+  const w = cur(), inp = q("ans");
+  if (!inp) return;
+  const v = norm(inp.value);
+  if (!v) return;
+  const ok = variants(w).indexOf(v) >= 0;
+  P.fb = { ok };
+  ok ? P.score.ok++ : P.score.bad++;
+  render();
+}
+
+// ----- list / manage -----
+let pendingDel = null, pendingTimer = null;
+function renderList() {
+  const sel = selected();
+  const ls = lessons();
+  const defLesson = ls.length ? ls[ls.length - 1] : 1;
+  let h = '<div class="panel"><p class="lbl">הוספת מילה</p><div class="form">' +
+    '<div class="two"><input type="number" id="nw-lesson" min="1" value="' + defLesson + '" aria-label="שיעור"><input type="text" id="nw-en" dir="ltr" placeholder="English"></div>' +
+    '<input type="text" id="nw-he" placeholder="עברית">' +
+    '<input type="text" id="nw-ex" dir="ltr" placeholder="Example sentence (optional)">' +
+    '<div class="row"><button class="btn pri" data-act="addword">הוסף</button><span class="lbl" style="margin:0">האודיו של מילה חדשה נוצר אוטומטית בפעם הבאה שתלחץ נגן.</span></div></div></div>';
+  h += '<div class="panel">';
+  if (!sel.length) h += '<div class="empty">בחר שיעור.</div>';
+  else h += '<div class="list">' + sel.map((w) => {
+    const k = S.known[w.id], armed = pendingDel === w.id;
+    return '<div class="item' + (k ? " known" : "") + '"><div class="t"><div class="en">' + esc(w.en) + '</div><div class="he">' + esc(w.he) + '</div></div><button class="spk" data-act="speakid" data-v="' + esc(w.id) + '">🔊</button><span class="ltag">ש' + w.lesson + "</span>" +
+      '<button class="btn sm' + (k ? "" : " ok") + '" data-act="toggle" data-v="' + esc(w.id) + '">' + (k ? "החזר" : "ידוע ✓") + "</button>" +
+      '<button class="btn sm' + (armed ? " danger" : "") + '" data-act="del" data-v="' + esc(w.id) + '" aria-label="מחק">' + (armed ? "בטוח?" : "🗑") + "</button></div>";
+  }).join("") + "</div>";
+  h += "</div>";
+  q("main").innerHTML = h;
+}
+function addWord() {
+  const en = q("nw-en").value.trim(), he = q("nw-he").value.trim();
+  const lesson = Math.max(1, parseInt(q("nw-lesson").value, 10) || 1);
+  if (!en || !he) { toast("צריך למלא גם אנגלית וגם עברית", 2500); return; }
+  S.custom.push({ id: "c:" + Date.now() + ":" + Math.floor(Math.random() * 1e4), lesson, en, he, ex: q("nw-ex").value.trim() });
+  if (S.sel[lesson] === undefined) S.sel[lesson] = 1;
+  save(); rebuildWords(); resetPractice(); L.stale = true; render();
+  toast("נוספה: " + en, 2000);
+}
+function deleteWord(id) {
+  if (pendingDel !== id) {
+    pendingDel = id; clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => { pendingDel = null; if (S.tab === "list") render(); }, 3000);
+    render(); return;
+  }
+  pendingDel = null;
+  const w = BYID[id];
+  if (w && w.custom) S.custom = S.custom.filter((c) => c.id !== id);
+  else S.removed[id] = 1;
+  delete S.known[id];
+  save(); rebuildWords(); resetPractice(); L.stale = true; render();
+}
+function renderKnown() {
+  const ids = Object.keys(S.known).filter((k) => BYID[k]);
+  const removedBase = BASE.map((r) => ({ id: r.lesson + ":" + r.en, en: r.en, lesson: r.lesson })).filter((r) => S.removed[r.id]);
+  let h = '<div class="panel"><p class="lbl">כל המילים שסימנת כידועות. אפשר להחזיר אותן לתרגול.</p>';
+  if (!ids.length) h += '<div class="empty">עוד לא סימנת מילים.</div>';
+  else h += '<div class="row" style="margin-bottom:8px"><button class="btn sm" data-act="restoreall">החזר את כולן</button></div><div class="list">' +
+    ids.map((id) => { const w = BYID[id]; return '<div class="item"><div class="t"><div class="en">' + esc(w.en) + '</div><div class="he">' + esc(w.he) + '</div></div><span class="ltag">ש' + w.lesson + '</span><button class="btn sm" data-act="restore" data-v="' + esc(id) + '">החזר</button></div>'; }).join("") + "</div>";
+  h += "</div>";
+  if (removedBase.length) h += '<div class="panel"><p class="lbl">מילים מקוריות שמחקת</p><div class="list">' +
+    removedBase.map((r) => '<div class="item"><div class="t"><div class="en">' + esc(r.en) + '</div></div><span class="ltag">ש' + r.lesson + '</span><button class="btn sm" data-act="undelete" data-v="' + esc(r.id) + '">שחזר</button></div>').join("") + "</div></div>";
+  const dump = JSON.stringify({ known: ids, custom: S.custom, removed: Object.keys(S.removed) });
+  h += '<div class="panel"><p class="lbl">גיבוד / שחזור (הנתונים נשמרים בדפדפן הזה; כאן אפשר להעתיק אותם למכשיר אחר)</p><textarea id="io" spellcheck="false">' + esc(dump) + '</textarea>' +
+    '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy">העתק</button><button class="btn sm pri" data-act="import">טען מהתיבה</button></div><div class="lbl" id="iomsg" style="margin-top:8px">' + esc(P.msg) + "</div></div>";
+  q("main").innerHTML = h;
+}
+
+// ---------- listen mode (single WAV through one <audio>) ----------
+const aud = q("aud");
+const L = { sess: null, key: "", url: null, idx: -1, building: false, stale: true, progress: "", diag: "" };
+const cleanHe = (s) => s.replace(/\.\.\./g, "").replace(/\s*[–/]\s*/g, ", ").replace(/[()]/g, " ").trim();
+const cleanEn = (s) => s.replace(/\(.*?\)/g, "").replace(/\.\.\./g, "").replace(/\s*[–/]\s*/g, ", ").trim();
+// 0.5s of silence, used to "unlock" the audio element inside the tap on iOS
+const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+
+function sessionKey(words) { return words.map((w) => w.id).join("|") + "#" + S.listen.pause + "#" + S.listen.gap; }
+function setMedia(w) {
+  if (!("mediaSession" in navigator) || !w) return;
+  try { navigator.mediaSession.metadata = new MediaMetadata({ title: w.en, artist: w.he, album: "אוצר מילים" }); } catch (e) {}
+}
+function installMediaHandlers() {
+  if (!("mediaSession" in navigator)) return;
+  const h = (n, f) => { try { navigator.mediaSession.setActionHandler(n, f); } catch (e) {} };
+  h("play", () => aud.play());
+  h("pause", () => aud.pause());
+  h("nexttrack", () => jump(1));
+  h("previoustrack", () => jump(-1));
+}
+function jump(d) {
+  if (!L.sess) return;
+  const m = L.sess.marks;
+  const i = (markIndexAt(m, aud.currentTime) + d + m.length) % m.length;
+  aud.currentTime = m[i].start + 0.01;
+}
+function showNow(i) {
+  L.idx = i;
+  const w = L.sess && BYID[L.sess.marks[i].id];
+  const el = q("lnow");
+  if (!el || !w) return;
+  el.innerHTML = '<div class="big he">' + esc(w.he) + '</div><div class="big" dir="ltr" style="margin-top:8px">' + esc(w.en) + '</div><div class="hint">' + (i + 1) + " / " + L.sess.marks.length + "</div>";
+  setMedia(w);
+}
+aud.addEventListener("timeupdate", () => {
+  if (!L.sess) return;
+  const i = markIndexAt(L.sess.marks, aud.currentTime);
+  if (i !== L.idx) showNow(i);
+});
+aud.addEventListener("play", () => { if (S.tab === "listen") updPlayBtn(); });
+aud.addEventListener("pause", () => { if (S.tab === "listen") updPlayBtn(); });
+function updPlayBtn() {
+  const b = q("lplay");
+  if (b) b.textContent = L.building ? "⏳ מכין..." : aud.paused ? "▶ נגן" : "⏸ עצור";
+}
+function setProgress(t) {
+  L.progress = t;
+  const el = q("lprog");
+  if (el) el.textContent = t;
+}
+async function prepareSession() {
+  let words = pool();
+  if (S.listen.shuf) words = shuffle(words);
+  const key = sessionKey(words);
+  if (L.sess && !L.stale && !S.listen.shuf && key === L.key) return true;
+  L.building = true; updPlayBtn();
+  try {
+    const sess = await buildSession(getWav, words, { pause: S.listen.pause, gap: S.listen.gap, cleanHe, cleanEn }, (i, n) => setProgress(i < n ? "מכין אודיו… " + i + " / " + n + " (בפעם הראשונה לוקח זמן, אחר כך זה נשמר)" : ""));
+    if (L.url) URL.revokeObjectURL(L.url);
+    L.url = URL.createObjectURL(new Blob([sess.wav], { type: "audio/wav" }));
+    L.sess = sess; L.key = key; L.stale = false; L.idx = -1;
+    aud.src = L.url;
+    return true;
+  } catch (e) {
+    setProgress("");
+    toast("שגיאה בהכנת האודיו: " + (e && e.message ? e.message : e) + " — נסה 'בדיקת מנוע'.", 8000);
+    return false;
+  } finally {
+    L.building = false; updPlayBtn();
+  }
+}
+async function playListen() {
+  if (L.building) return;
+  if (!aud.paused) { aud.pause(); return; }
+  toast("");
+  if (!pool().length) return;
+  // unlock the element inside the user gesture (needed on iOS, since building takes a while)
+  if (!L.sess || L.stale) { aud.src = SILENT; aud.loop = false; aud.play().catch(() => {}); }
+  const ok = await prepareSession();
+  aud.loop = true;
+  if (!ok) { aud.pause(); return; }
+  installMediaHandlers();
+  try { await aud.play(); } catch (e) { toast("הדפדפן חסם את הנגינה: לחץ שוב על נגן.", 5000); }
+  if ("mediaSession" in navigator) { try { navigator.mediaSession.playbackState = "playing"; } catch (e) {} }
+}
+function listenKnown() {
+  if (!L.sess || L.idx < 0) return;
+  const id = L.sess.marks[L.idx].id;
+  S.known[id] = 1; save(); L.stale = true;
+  renderTop();
+  toast("סומנה כידועה. היא תדולג בהכנה הבאה (עצור ולחץ נגן).", 3500);
+}
+async function runDiag() {
+  const el = q("diag");
+  el.textContent = "בודק… (בפעם הראשונה מוריד את מנוע ה-TTS)";
+  try {
+    const r = await selfTest();
+    el.textContent = "✅ המנוע עובד\nentry: " + r.entry + "\nmode: " + r.mode + "\nעברית: " + r.heBytes + " bytes, אנגלית: " + r.enBytes + " bytes\nזמן: " + r.ms + "ms\nמילים בקאש: " + (await cacheSize());
+  } catch (e) {
+    el.textContent = "❌ " + (e && e.stack ? e.stack : e);
+  }
+}
+function renderListen() {
+  const n = pool().length;
+  if (!selected().length) { q("main").innerHTML = '<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>'; return; }
+  if (!n) { q("main").innerHTML = '<div class="panel empty">אין מילים להאזנה – כולן מסומנות כידועות.</div>'; return; }
+  const sel = (k, vals, labels) => '<select class="sel" data-act="lset" data-k="' + k + '">' + vals.map((v, i) => '<option value="' + v + '"' + (+S.listen[k] === v ? " selected" : "") + ">" + labels[i] + "</option>").join("") + "</select>";
+  const w = L.sess && L.idx >= 0 && BYID[L.sess.marks[L.idx].id];
+  const now = w
+    ? '<div class="big he">' + esc(w.he) + '</div><div class="big" dir="ltr" style="margin-top:8px">' + esc(w.en) + '</div><div class="hint">' + (L.idx + 1) + " / " + L.sess.marks.length + "</div>"
+    : '<div class="hint">' + n + " מילים מוכנות להאזנה<br>לחץ ▶ להתחלה</div>";
+  q("main").innerHTML = '<div class="panel"><p class="lbl">מקריא את כל המילים שעוד לא סימנת כידועות: עברית, הפסקה, אנגלית, ובסוף הרשימה חוזר להתחלה. האודיו הוא קובץ אמיתי, ולכן ממשיך לנגן גם כשהדפדפן ממוזער או המסך כבוי.</p>' +
+    '<div id="lnow" class="card" style="min-height:150px;cursor:default;padding:16px">' + now + "</div>" +
+    '<div class="lbl" id="lprog" style="text-align:center;margin-top:8px">' + esc(L.progress) + "</div>" +
+    '<div class="row c" style="margin-top:6px"><button class="btn" data-act="lprev">⏮</button><button class="btn pri" id="lplay" style="font-size:20px;padding:8px 26px" data-act="lplay">' + (L.building ? "⏳ מכין..." : aud.paused ? "▶ נגן" : "⏸ עצור") + '</button><button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div></div>' +
+    '<div class="panel"><div class="row" style="gap:12px">' +
+    '<label class="lbl" style="margin:0">הפסקה עברית→אנגלית ' + sel("pause", [0.5, 1, 2, 3], ["חצי שנייה", "שנייה", "2 שניות", "3 שניות"]) + "</label>" +
+    '<label class="lbl" style="margin:0">בין מילים ' + sel("gap", [1, 2, 3, 5], ["שנייה", "2 שניות", "3 שניות", "5 שניות"]) + "</label>" +
+    '<label style="font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" data-act="lset" data-k="shuf"' + (S.listen.shuf ? " checked" : "") + "> ערבוב</label></div>" +
+    '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="diag">בדיקת מנוע</button><button class="btn sm" data-act="clearcache">נקה קאש אודיו</button></div><div id="diag"></div></div>';
+}
+
+// ---------- speech (cards only; not for background) ----------
+function speak(id) {
+  const w = id ? BYID[id] : cur();
+  if (!w) return;
+  const NO = "לא נשמע קול. ההקראה לא עובדת במסך הזה. נסה לפתוח בכרום או בספארי ובדוק שהטלפון לא על שקט.";
+  toast("");
+  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") { toast(NO, 5000); return; }
+  try {
+    const u = new SpeechSynthesisUtterance(w.en.replace(/\(.*?\)/g, "").replace(/\s*\/\s*/g, ", "));
+    u.lang = "en-US"; u.rate = 0.9;
+    const ev = (speechSynthesis.getVoices() || []).filter((x) => /^en/i.test(x.lang))[0];
+    if (ev) u.voice = ev;
+    u.onerror = () => toast(NO, 5000);
+    u.onstart = () => { u._ok = 1; toast(""); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending && !u._ok) toast(NO, 5000); }, 1500);
+  } catch (e) { toast(NO, 5000); }
+}
+function autoSpeak() {
+  if (!S.auto || ["cards", "quiz", "type"].indexOf(S.tab) < 0) return;
+  const w = cur();
+  if (!w) return;
+  if (!(isEnFront() || P.flip || P.ans !== null || P.fb !== null)) return;
+  if (P.spoken === w.id) return;
+  P.spoken = w.id; speak();
+}
+
+function render() {
+  renderTop();
+  ({ cards: renderCards, quiz: renderQuiz, type: renderType, listen: renderListen, list: renderList, known: renderKnown })[S.tab]();
+  autoSpeak();
+}
+
+// ---------- events ----------
+document.addEventListener("change", (e) => {
+  const t = e.target, a = t.dataset && t.dataset.act;
+  if (a === "dir") { S.dir = t.value; save(); resetPractice(); render(); }
+  else if (a === "lset") { S.listen[t.dataset.k] = t.type === "checkbox" ? t.checked : +t.value; save(); L.stale = true; }
+  else if (a === "auto") { S.auto = t.checked; save(); if (S.auto) { P.spoken = null; autoSpeak(); } }
+});
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el || el.tagName === "SELECT" || el.tagName === "INPUT") return;
+  const a = el.dataset.act, v = el.dataset.v;
+  switch (a) {
+    case "lesson": S.sel[v] = lessonOn(+v) ? 0 : 1; save(); L.stale = true; resetPractice(); render(); break;
+    case "all": lessons().forEach((l) => { S.sel[l] = 1; }); save(); L.stale = true; resetPractice(); render(); break;
+    case "none": lessons().forEach((l) => { S.sel[l] = 0; }); save(); L.stale = true; resetPractice(); render(); break;
+    case "tab": S.tab = v; save(); resetPractice(); render(); break;
+    case "restart": resetPractice(); render(); break;
+    case "flip": P.flip = !P.flip; render(); break;
+    case "speak": speak(); break;
+    case "speakid": speak(v); break;
+    case "lplay": playListen(); break;
+    case "lprev": jump(-1); break;
+    case "lnext": jump(1); break;
+    case "lknown": listenKnown(); break;
+    case "diag": runDiag(); break;
+    case "clearcache": clearCache().then(() => { L.stale = true; toast("הקאש נוקה", 2000); }); break;
+    case "skip": next(); break;
+    case "back": if (P.i > 0) { P.i--; P.flip = false; P.ans = null; P.fb = null; P.spoken = null; makeOpts(); render(); } break;
+    case "know": markKnown(P.queue[P.i]); break;
+    case "opt": if (P.ans === null) { P.ans = +v; P.opts[+v] === back(cur()) ? P.score.ok++ : P.score.bad++; render(); } break;
+    case "check": checkType(); break;
+    case "reveal": P.fb = { ok: false }; P.score.bad++; render(); break;
+    case "toggle": if (S.known[v]) delete S.known[v]; else S.known[v] = 1; save(); L.stale = true; resetPractice(); render(); break;
+    case "restore": delete S.known[v]; save(); L.stale = true; resetPractice(); render(); break;
+    case "restoreall": S.known = {}; save(); L.stale = true; resetPractice(); render(); break;
+    case "addword": addWord(); break;
+    case "del": deleteWord(v); break;
+    case "undelete": delete S.removed[v]; save(); rebuildWords(); L.stale = true; resetPractice(); render(); break;
+    case "copy": {
+      const ta = q("io");
+      ta.select();
+      try { navigator.clipboard.writeText(ta.value).then(() => { q("iomsg").textContent = "הועתק ✓"; }, () => { q("iomsg").textContent = "סמן והעתק ידנית"; }); } catch (err) { q("iomsg").textContent = "סמן והעתק ידנית"; }
+      break;
+    }
+    case "import":
+      try {
+        const data = JSON.parse(q("io").value);
+        const ids = Array.isArray(data) ? data : data.known || [];
+        if (!Array.isArray(ids)) throw new Error("bad");
+        if (!Array.isArray(data)) {
+          S.custom = Array.isArray(data.custom) ? data.custom : S.custom;
+          S.removed = {}; (data.removed || []).forEach((id) => { S.removed[id] = 1; });
+          rebuildWords();
+        }
+        const k = {}; ids.forEach((id) => { if (BYID[id]) k[id] = 1; });
+        S.known = k; save(); L.stale = true;
+        P.msg = "נטען ✓ (" + Object.keys(k).length + " מילים ידועות)";
+        resetPractice(); render();
+      } catch (err) { q("iomsg").textContent = "פורמט לא תקין"; }
+      break;
+  }
+});
+
+// ---------- boot ----------
+(async function boot() {
+  try {
+    BASE = await (await fetch("words.json")).json();
+  } catch (e) {
+    q("main").innerHTML = '<div class="panel empty">לא הצלחתי לטעון את words.json. פתח את האתר דרך כתובת (לא כקובץ מקומי).</div>';
+    return;
+  }
+  rebuildWords();
+  resetPractice();
+  render();
+})();
