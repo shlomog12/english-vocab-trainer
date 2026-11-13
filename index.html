@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>אוצר מילים באנגלית</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#12141b">
+<title>אוצר מילים באנגלית</title>
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#1b1f2a;--mute:#6b7280;--line:#e3e6ee;--acc:#4f46e5;--acc2:#eef0ff;--ok:#16a34a;--okbg:#e8f8ee;--bad:#dc2626;--badbg:#fdeaea}
 @media(prefers-color-scheme:dark){:root{--bg:#12141b;--card:#1c1f2a;--ink:#eceef5;--mute:#9aa1b2;--line:#2c3040;--acc:#8b86ff;--acc2:#262a47;--ok:#4ade80;--okbg:#17301f;--bad:#f87171;--badbg:#3a1c1c}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
-.wrap{max-width:720px;margin:0 auto;padding:14px 14px 80px}
+.wrap{max-width:720px;margin:0 auto;padding:14px 14px 60px}
 h1{font-size:20px;margin:6px 0 2px}
 .sub{color:var(--mute);font-size:13px;margin-bottom:12px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
@@ -27,10 +27,8 @@ h1{font-size:20px;margin:6px 0 2px}
 .bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
 .bar i{display:block;height:100%;background:var(--ok)}
 .btn{border-radius:10px}
-.btn[disabled]{opacity:.45}
 .btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
 .btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
-.btn.danger{background:var(--bad);color:#fff;border-color:var(--bad)}
 .btn.sm{padding:4px 10px;font-size:13px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row.c{justify-content:center}
@@ -44,7 +42,7 @@ h1{font-size:20px;margin:6px 0 2px}
 .opt{font:inherit;text-align:center;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:16px}
 .opt.right{background:var(--okbg);border-color:var(--ok)}
 .opt.wrong{background:var(--badbg);border-color:var(--bad)}
-input[type=text],input[type=number],textarea{font:inherit;width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:17px}
+input[type=text],textarea{font:inherit;width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:17px}
 textarea{font-size:13px;min-height:90px;direction:ltr}
 .fb{margin-top:10px;padding:10px;border-radius:10px;font-size:15px}
 .fb.ok{background:var(--okbg);color:var(--ok)}.fb.bad{background:var(--badbg);color:var(--bad)}
@@ -59,11 +57,13 @@ textarea{font-size:13px;min-height:90px;direction:ltr}
 .empty{text-align:center;color:var(--mute);padding:30px 10px}
 .spk{background:none;border:0;font-size:20px;cursor:pointer;color:var(--acc)}
 .sel{font:inherit;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.chip.part{background:var(--acc2);border-color:var(--acc);color:var(--acc)}
+.chip.sm2{padding:4px 11px;font-size:13px}
+.btn[disabled]{opacity:.45}
+.btn.danger{background:var(--bad);color:#fff;border-color:var(--bad)}
 .form{display:grid;gap:8px}
-.form .two{display:grid;grid-template-columns:90px 1fr;gap:8px}
-#toast{position:fixed;left:10px;right:10px;bottom:10px;text-align:center;font-size:14px;color:var(--bad);background:var(--badbg);border-radius:10px;padding:8px 10px}
-#toast:empty{display:none}
-#diag{font-family:ui-monospace,Menlo,monospace;font-size:12px;direction:ltr;text-align:left;white-space:pre-wrap;color:var(--mute);margin-top:8px}
+.form .two{display:grid;grid-template-columns:1fr 90px;gap:8px}
+input[type=number]{font:inherit;width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:17px}
 </style>
 </head>
 <body>
@@ -72,17 +72,552 @@ textarea{font-size:13px;min-height:90px;direction:ltr}
   <div class="sub">בחר שיעורים, תרגל, וסמן מילים שאתה כבר יודע כדי שלא יופיעו שוב.</div>
 
   <div class="panel">
-    <p class="lbl">שיעורים לתרגול (אפשר לבחור כמה)</p>
-    <div class="chips" id="lessons"></div>
+    <p class="lbl">סינון לתרגול: שנה / סמסטר / שיעורים (אפשר לבחור כמה)</p>
+    <div id="lessons"></div>
     <div class="stats" id="stats"></div>
     <div class="bar"><i id="barfill" style="width:0"></i></div>
   </div>
 
   <div class="tabs" id="tabs"></div>
   <div id="main"></div>
-  <div id="toast"></div>
+  <div id="toast" style="position:fixed;left:10px;right:10px;bottom:10px;text-align:center;font-size:14px;color:var(--bad);background:var(--badbg);border-radius:10px;padding:8px 10px;empty-cells:hide"></div>
+  <style>#toast:empty{display:none}</style>
 </div>
-<audio id="aud" loop playsinline></audio>
-<script type="module" src="app.js?v=5"></script>
+
+<script src="data.js"></script>
+<script>
+// [lesson, english, hebrew, example]
+var RAW=[
+[1,"Bucket list","רשימת משאלות",""],
+[1,"Drink","לשתות",""],
+[1,"Drank","שתיתי",""],
+[1,"Dark","כהה",""],
+[1,"Hobbies","תחביבים",""],
+[1,"Had to","הייתי חייב",""],
+[1,"Could","יכול היה",""],
+[1,"Couldn't","לא יכול היה",""],
+[1,"To get used to something","להתרגל למשהו",""],
+[1,"Later on","מאוחר יותר",""],
+[1,"Ultra-Orthodox","חרדי",""],
+[1,"9:30 / Half past 9","תשע וחצי",""],
+[1,"Express","להביע",""],
+[1,"Local","מקומי",""],
+[1,"Council / Municipality","מועצה / עירייה",""],
+[1,"Collapse","להתמוטט",""],
+[1,"To crash out (to sleep)","לקרוס (לישון)",""],
+[1,"To give birth","ללדת",""],
+[2,"Journey","מסע","It was a long journey to Israel."],
+[2,"Commute","נסיעה לעבודה","Her commute to work took two hours."],
+[2,"To predict","לחזות","It's important to predict what the possible hurdles could be."],
+[2,"Prediction","תחזית","The prediction that the protest would turn violent was wrong, as it remained peaceful."],
+[2,"Took place in...","...התקיים ב","The conference took place somewhere abroad."],
+[2,"Funeral","הלוויה","They saw him at a funeral."],
+[2,"Recruit / Recruited","לגייס / גויס","They tried to recruit him for a mission. He was recruited by a company in England."],
+[2,"To say bad things about someone","להגיד דברים רעים על מישהו","They heard him say bad things about someone."],
+[2,"Bombed","הופצץ","They bombed the area."],
+[2,"Prison","כלא","He was arrested and placed in prison."],
+[2,"Under arrest","במעצר","The leader of the protest was under arrest and sent to prison."],
+[2,"Pilot","טייס","The pilot flew the jet plane over Europe."],
+[2,"Aircraft","כלי טיס","The aircraft was very impressive."],
+[2,"Bring – brought","להביא – הביא","",1],
+[2,"Find – found","למצוא – מצא","",1],
+[2,"Fly – flew","לטוס – טס","",1],
+[2,"Understand – understood","להבין – הבין","",1],
+[2,"To adapt","להתאים","A good manager knows how to adapt quickly to the situation."],
+[2,"Creatively","יצירתי","Some people can solve problems creatively."],
+[2,"Espionage","ריגול","The government uncovered a case of espionage."],
+[2,"Covert","חשאי","The covert operation was a success."],
+[2,"Surveillance","מעקב","The police conducted surveillance on the suspect."],
+[3,"Wednesday, the 28th of October","יום רביעי, ה-28 באוקטובר",""],
+[3,"Hall","אולם","We are meeting in the hall later."],
+[3,"Give us","תנו לנו","Please give us a chance."],
+[3,"Inhabitant","תושב","The inhabitant of the house is friendly. / Every inhabitant of the town was invited."],
+[3,"Isolated","מבודד","The isolated island is hard to reach."],
+[3,"Statues","פסלים","The statues in the museum are ancient."],
+[3,"Preserved","נשמר / שימרו","The documents were preserved carefully."],
+[3,"To rest","לנוח","I need to rest after a long day."],
+[3,"The rest of","שאר ה... / השאר של","We'll discuss the rest of the plan tomorrow."],
+[3,"Rest on me","תנוח עליי (סמוך עליי)","You can rest on me if you're tired."],
+[3,"Medicine","תרופה","Take your medicine on time."],
+[3,"Medical","רפואי","She works in a medical clinic."],
+[3,"To keep it clean","לשמור על זה נקי","Don't forget to keep it clean."],
+[3,"To check","לבדוק","I need to check my emails."],
+[3,"That sounds nice","זה נשמע נחמד","Your idea sounds nice to me."],
+[3,"Strategic","אסטרטגי","Their strategic plan was successful."],
+[3,"Inhabited","מאוכלס","The island is inhabited by a small community."],
+[3,"Scenery","נוף","The scenery on this island is breathtaking."],
+[3,"Breathtaking","עוצר נשימה","The view from the balcony is breathtaking."],
+[3,"I always","אני תמיד","I always forget my keys."],
+[3,"Close – closer – closest","קרוב – יותר קרוב – הכי קרוב","Move closer to hear better.",1],
+[3,"Pronunciation","הגייה",""],
+[3,"Yemen","תימן",""],
+[3,"Island","אי",""],
+[4,"From (place / person)","מ","The e-mail came from Jack. My parents came from England."],
+[4,"Than","מ (בהשוואה)","I am bigger than you. He is smarter than us."],
+[4,"Solve","לפתור","Can you help me solve the problem?"],
+[4,"Meet – met – met","לפגוש – פגש – פגשת","I met him last week at the park.",1],
+[4,"Cost – cost – cost","לעלות – עלה – עלתה","The tickets cost a lot of money.",1],
+[4,"On the weekend / On Monday","בסוף שבוע / ביום שני","I went to a meeting at work on the weekend."],
+[4,"Satisfied","מרוצה","My manager is very satisfied with my performance at work."],
+[4,"Pronunciation","הגייה",""],
+[5,"Preparation","הכנה","I have some last-minute preparations to finish."],
+[5,"Prepare","להכין","I need to prepare myself for the conference."],
+[5,"To get stuck","להתקע","I really can't get stuck abroad."],
+[5,"I was born on","נולדתי ב-24 בדצמבר","I was born on the 24th of December."],
+[5,"Dancer","רקדן","She is a talented dancer."],
+[5,"Bring / Brought","להביא / הביא","She brought a gift to the party."],
+[5,"Buy / Bought","לקנות / קנה","I bought a new book yesterday."],
+[5,"Ourselves","את עצמנו","We need to take care of ourselves."],
+[5,"Yourselves","את עצמכם","You should focus on yourselves first."],
+[5,"Mature","בוגר","He's very mature for his age."],
+[5,"Reliable","אמין","She's a reliable friend you can always count on."],
+[5,"Polite","מנומס","He's always polite and respectful."],
+[5,"Patient","סבלני","You need to be patient with the learning process."],
+[5,"Sensitive","רגיש","He's very sensitive to criticism."],
+[5,"Competitive","תחרותי","She's highly competitive in sports."],
+[5,"Self-confident","בעל ביטחון עצמי","He's self-confident and believes in his abilities."],
+[5,"Selfish","אנוכי (אגואיסט)","Her selfish behavior hurt her friends."],
+[5,"To move home","לעבור דירה","We're planning to move home next month."],
+[5,"Interrupt","להפריע","Please don't interrupt me while I'm speaking."],
+[5,"I wish I was more reliable and creative","הלוואי שהייתי יותר אמין ויצירתי",""],
+[5,"I want to be more creative","אני רוצה להיות יותר יצירתי",""],
+[5,"Determined","נחוש","She is determined to achieve her goals."],
+[5,"Meticulous","קפדן","It's hard working with such a meticulous person."]
+];
+var SEMS=[
+ {id:"a25",name:"סמסטר א׳ 2025",short:"א׳25",year:2025},
+ {id:"b25",name:"סמסטר ב׳ 2025",short:"ב׳25",year:2025},
+ {id:"c25",name:"סמסטר ג׳ 2025",short:"ג׳25",year:2025},
+ {id:"a26",name:"סמסטר א׳ 2026",short:"א׳26",year:2026},
+ {id:"b26",name:"סמסטר ב׳ 2026",short:"ב׳26",year:2026},
+ {id:"c26",name:"סמסטר ג׳ 2026",short:"ג׳26",year:2026}
+];
+var SEMBY={};SEMS.forEach(function(s,i){s.idx=i;s.lessons=[];SEMBY[s.id]=s});
+var WORDS=[],BYID={};
+function addW(sem,lesson,en,he,ex,v){
+  lesson=String(lesson);
+  var id=sem==="c26"?lesson+":"+en:sem+":"+lesson+":"+en;
+  if(BYID[id])id+="#"+WORDS.length;
+  var w={id:id,sem:sem,lesson:lesson,en:en,he:he,ex:ex||"",v:!!v};
+  WORDS.push(w);BYID[id]=w;
+}
+RAW.forEach(function(r){addW("c26",r[0],r[1],r[2],r[3],r[4])});
+if(typeof RAW2!=="undefined")RAW2.forEach(function(r){addW(r[0],r[1],r[2],r[3],r[4],r[5])});
+WORDS=WORDS.map(function(w,i){return {w:w,i:i}}).sort(function(a,b){return SEMBY[a.w.sem].idx-SEMBY[b.w.sem].idx||a.i-b.i}).map(function(x){return x.w});
+var BASE_WORDS=WORDS.slice();
+WORDS.forEach(function(w){var s=SEMBY[w.sem];if(s.lessons.indexOf(w.lesson)<0)s.lessons.push(w.lesson)});
+function ltag(w){return '<span class="ltag">'+SEMBY[w.sem].short+' · ש'+esc(w.lesson)+'</span>'}
+var LESSONS=[1,2,3,4,5];
+
+// ---------- state ----------
+var KEY="eng-s3-2026-v1";
+var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1},fopen:true,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
+// state saved by the first GitHub-pages version (same word ids) is carried over once
+function migrateOld(){try{var o=JSON.parse(localStorage.getItem("eng-vocab-trainer-v1")||"null");if(!o)return null;
+  return {known:o.known||{},removed:o.removed||{},dir:o.dir,custom:(o.custom||[]).map(function(c){return {id:c.id,sem:"c26",lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||""}})}}catch(e){return null}}
+try{var sv=JSON.parse(localStorage.getItem(KEY)||"null");if(!sv)sv=migrateOld();if(sv){S.known=sv.known||{};S.custom=sv.custom||[];S.removed=sv.removed||{};S.sel=sv.sel||S.sel;
+  (function(){var o=S.sel,m={},old=false,k;for(k in o){if(k.indexOf(":")<0)old=true}
+  if(old){if(o[5]===undefined)o[5]=1;for(k in o){if(o[k])m["c26:"+k]=1}S.sel=m}})();S.dir=sv.dir||S.dir;S.tab=sv.tab||S.tab;S.auto=!!sv.auto;if(sv.listen){for(var lk in sv.listen)S.listen[lk]=sv.listen[lk]}}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({known:S.known,custom:S.custom,removed:S.removed,sel:S.sel,dir:S.dir,tab:S.tab,auto:S.auto,listen:S.listen}))}catch(e){}}
+function applyUserWords(){
+  var ws=BASE_WORDS.filter(function(w){return !S.removed[w.id]});
+  S.custom.forEach(function(c){ws.push({id:c.id,sem:c.sem,lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||"",v:false,custom:true})});
+  WORDS=ws.map(function(w,i){return {w:w,i:i}}).sort(function(a,b){return SEMBY[a.w.sem].idx-SEMBY[b.w.sem].idx||a.i-b.i}).map(function(x){return x.w});
+  BYID={};WORDS.forEach(function(w){BYID[w.id]=w});
+  SEMS.forEach(function(s){s.lessons=[]});
+  WORDS.forEach(function(w){var s=SEMBY[w.sem];if(s.lessons.indexOf(w.lesson)<0)s.lessons.push(w.lesson)});
+}
+applyUserWords();
+var pendingDel=null,pendingTimer=null;
+function addWord(){
+  var en=q("nw-en").value.trim(),he=q("nw-he").value.trim(),sem=q("nw-sem").value,lesson=q("nw-lesson").value.trim();
+  if(!en||!he||!lesson){tmsg("צריך למלא שיעור, אנגלית ועברית");setTimeout(function(){tmsg("")},2500);return}
+  S.custom.push({id:"c:"+Date.now()+":"+Math.floor(Math.random()*1e4),sem:sem,lesson:lesson,en:en,he:he,ex:q("nw-ex").value.trim()});
+  S.sel[sem+":"+lesson]=1;save();applyUserWords();resetPractice();render();
+}
+function deleteWord(id){
+  if(pendingDel!==id){pendingDel=id;clearTimeout(pendingTimer);pendingTimer=setTimeout(function(){pendingDel=null;if(S.tab==="list")render()},3000);render();return}
+  pendingDel=null;
+  var w=BYID[id];
+  if(w&&w.custom)S.custom=S.custom.filter(function(c){return c.id!==id});else S.removed[id]=1;
+  delete S.known[id];save();applyUserWords();resetPractice();render();
+}
+
+var P={queue:[],i:0,flip:false,ans:null,fb:null,score:{ok:0,bad:0},opts:[],msg:""};
+
+function selected(){return WORDS.filter(function(w){return S.sel[w.sem+":"+w.lesson]})}
+function pool(){return selected().filter(function(w){return !S.known[w.id]})}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function q(id){return document.getElementById(id)}
+function front(w){return S.dir==="en2he"?w.en:w.he}
+function back(w){return S.dir==="en2he"?w.he:w.en}
+function isEnFront(){return S.dir==="en2he"}
+
+function resetPractice(){P.queue=shuffle(pool()).map(function(w){return w.id});P.i=0;P.flip=false;P.ans=null;P.fb=null;P.score={ok:0,bad:0};P.msg="";P.spoken=null;stopListen();L.list=[];makeOpts()}
+function cur(){return BYID[P.queue[P.i]]}
+function makeOpts(){
+  var w=cur();P.opts=[];P.ans=null;
+  if(!w)return;
+  var correct=back(w);
+  var others=shuffle(WORDS.filter(function(x){return back(x)!==correct})).slice(0,3).map(back);
+  P.opts=shuffle(others.concat([correct]));
+}
+function next(){P.i++;P.flip=false;P.ans=null;P.fb=null;makeOpts();render()}
+function markKnown(id){S.known[id]=1;save();
+  var k=P.queue.indexOf(id);
+  if(k>=0){P.queue.splice(k,1);if(k<P.i)P.i--}
+  P.flip=false;P.ans=null;P.fb=null;makeOpts();renderTop();render()}
+function unknown(id){delete S.known[id];save()}
+
+// ---------- rendering ----------
+function semKeys(s){return s.lessons.map(function(l){return s.id+":"+l})}
+function yearKeys(y){var r=[];SEMS.forEach(function(s){if(s.year===y)r=r.concat(semKeys(s))});return r}
+function allKeys(){var r=[];SEMS.forEach(function(s){r=r.concat(semKeys(s))});return r}
+function chipState(keys){var n=keys.filter(function(k){return S.sel[k]}).length;return n===0?"":(n===keys.length?" on":" part")}
+function filterHTML(){
+  var years=[];SEMS.forEach(function(s){if(years.indexOf(s.year)<0)years.push(s.year)});
+  var h='<div class="chips" style="margin-bottom:6px">'+years.map(function(y){return '<button class="chip'+chipState(yearKeys(y))+'" data-act="year" data-v="'+y+'">שנת '+y+'</button>'}).join("")+
+   '<button class="chip link" data-act="all">הכל</button><button class="chip link" data-act="none">נקה</button><button class="chip link" data-act="fopen">'+(S.fopen?'הסתר שיעורים ▴':'הצג סמסטרים ושיעורים ▾')+'</button></div>';
+  if(S.fopen)SEMS.forEach(function(s){
+    h+='<div style="margin-top:10px"><button class="chip sm2'+chipState(semKeys(s))+'" data-act="sem" data-v="'+s.id+'" style="font-weight:600">'+s.name+'</button></div><div class="chips" style="margin-top:6px">'+
+     s.lessons.map(function(l){return '<button class="chip sm2'+(S.sel[s.id+":"+l]?' on':'')+'" data-act="lesson" data-v="'+s.id+':'+esc(l)+'">שיעור '+esc(l)+'</button>'}).join("")+'</div>';
+  });
+  return h;
+}
+function selChanged(){save();resetPractice();render()}
+function toggleKeys(keys){var all=keys.every(function(k){return S.sel[k]});keys.forEach(function(k){S.sel[k]=all?0:1});selChanged()}
+function renderTop(){
+  q("lessons").innerHTML=filterHTML();
+  var sel=selected(),kn=sel.filter(function(w){return S.known[w.id]}).length;
+  q("stats").innerHTML='<span>נבחרו: <b>'+sel.length+'</b></span><span>ידועות: <b>'+kn+'</b></span><span>לתרגול: <b>'+(sel.length-kn)+'</b></span>';
+  q("barfill").style.width=(sel.length?Math.round(kn/sel.length*100):0)+"%";
+  var tabs=[["cards","כרטיסיות"],["quiz","בחירה"],["type","הקלדה"],["listen","🎧 האזנה"],["list","רשימה"],["known","ידועות ("+Object.keys(S.known).filter(function(k){return BYID[k]}).length+")"]];
+  q("tabs").innerHTML=tabs.map(function(t){return '<button class="tab'+(S.tab===t[0]?' on':'')+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+'</button>'}).join("");
+}
+function dirBar(){
+  return '<div class="row" style="margin-bottom:10px"><span class="lbl" style="margin:0">כיוון:</span><select class="sel" data-act="dir"><option value="en2he"'+(S.dir==="en2he"?' selected':'')+'>אנגלית ← עברית</option><option value="he2en"'+(S.dir==="he2en"?' selected':'')+'>עברית ← אנגלית</option></select><button class="btn sm" data-act="restart">ערבב מחדש</button><label style="font-size:13px;display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-act="auto"'+(S.auto?' checked':'')+'> הקראה אוטומטית</label></div>';
+}
+function wordHTML(text,en){return '<div class="big'+(en?'':' he')+'" dir="'+(en?'ltr':'rtl')+'">'+esc(text)+(en?' <button class="spk" data-act="speak" title="הקרא">🔊</button>':'')+'</div>'}
+function doneHTML(){
+  var n=pool().length;
+  if(!selected().length)return '<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>';
+  if(!n)return '<div class="panel empty">🎉 אין מילים לתרגול – כל המילים בשיעורים שנבחרו מסומנות כידועות.<br><br><button class="btn pri" data-act="tab" data-v="known">לרשימת הידועות</button></div>';
+  return '<div class="panel empty">🎉 סיימת סבב!'+((P.score.ok+P.score.bad)?'<br>נכון: '+P.score.ok+' · שגוי: '+P.score.bad:'')+'<br><br><button class="btn pri" data-act="restart">סבב חדש</button></div>';
+}
+function progress(){return '<div class="row" style="justify-content:space-between;margin-bottom:6px"><button class="btn sm" data-act="back"'+(P.i>0?'':' disabled style="opacity:.4"')+'>→ הקודם</button><span class="lbl" style="margin:0">'+(P.i+1)+' / '+P.queue.length+'</span><span style="width:70px"></span></div>'}
+
+function renderCards(){
+  var w=cur();var h=dirBar();
+  if(!w){q("main").innerHTML=h+doneHTML();return}
+  var f=isEnFront();
+  var body=P.flip
+    ? '<span class="tag">'+(f?'עברית':'English')+'</span>'+wordHTML(back(w),!f)+(w.ex?'<div class="ex">'+esc(w.ex)+'</div>':'')
+    : '<span class="tag">'+(f?'English':'עברית')+'</span>'+wordHTML(front(w),f)+'<div class="hint">לחץ להיפוך</div>';
+  h+=progress()+'<div class="panel card" data-act="flip">'+body+'</div>'+
+   '<div class="row c">'+
+   '<button class="btn" data-act="skip">עוד לא ↩</button>'+
+   '<button class="btn ok" data-act="know">ידוע ✓</button></div>';
+  q("main").innerHTML=h;
+}
+function renderQuiz(){
+  var w=cur();var h=dirBar();
+  if(!w){q("main").innerHTML=h+doneHTML();return}
+  var f=isEnFront(),correct=back(w);
+  h+=progress()+'<div class="panel" style="text-align:center"><span class="tag">'+(f?'מה פירוש המילה?':'איך אומרים באנגלית?')+'</span>'+wordHTML(front(w),f)+
+   '<div class="opts">'+P.opts.map(function(o,i){
+     var c="opt";if(P.ans!==null){if(o===correct)c+=" right";else if(i===P.ans)c+=" wrong"}
+     return '<button class="'+c+'" data-act="opt" data-v="'+i+'" dir="'+(f?'rtl':'ltr')+'">'+esc(o)+'</button>'}).join("")+'</div>';
+  if(P.ans!==null){
+    h+=(w.ex?'<div class="ex">'+esc(w.ex)+'</div>':'')+'<div class="row c" style="margin-top:14px"><button class="btn ok" data-act="know">ידוע ✓</button><button class="btn pri" data-act="skip">הבא ←</button></div>';
+  }
+  h+='</div>';
+  q("main").innerHTML=h;
+}
+function renderType(){
+  var w=cur();var h=dirBar();
+  if(!w){q("main").innerHTML=h+doneHTML();return}
+  var f=isEnFront();
+  h+=progress()+'<div class="panel" style="text-align:center"><span class="tag">'+(f?'כתוב בעברית':'Type in English')+'</span>'+wordHTML(front(w),f);
+  if(P.fb===null){
+    h+='<div style="margin-top:16px"><input type="text" id="ans" autocomplete="off" autocapitalize="off" dir="'+(f?'rtl':'ltr')+'" placeholder="'+(f?'התשובה...':'Answer...')+'"></div>'+
+     '<div class="row c" style="margin-top:12px"><button class="btn" data-act="reveal">הצג תשובה</button><button class="btn pri" data-act="check">בדוק</button></div>';
+  }else{
+    h+='<div class="fb '+(P.fb.ok?'ok':'bad')+'">'+(P.fb.ok?'✓ נכון!':'✗ התשובה: ')+(P.fb.ok?'':'<span dir="'+(f?'rtl':'ltr')+'"><b>'+esc(back(w))+'</b></span>')+'</div>'+
+     (w.ex?'<div class="ex">'+esc(w.ex)+'</div>':'')+
+     '<div class="row c" style="margin-top:14px"><button class="btn ok" data-act="know">ידוע ✓</button><button class="btn pri" data-act="skip">הבא ←</button></div>';
+  }
+  h+='</div>';
+  q("main").innerHTML=h;
+  var inp=q("ans");if(inp){inp.focus();inp.addEventListener("keydown",function(e){if(e.key==="Enter")checkType()})}
+}
+function norm(s){return s.toLowerCase().replace(/\(.*?\)/g,"").replace(/[.,!?'"׳״]/g,"").replace(/[–—]/g,"-").replace(/\s+/g," ").trim()}
+function variants(w){
+  var t=back(w),vs=[t];
+  t.split(/\s*\/\s*/).forEach(function(x){vs.push(x)});
+  if(w.v&&isEnFront()===false)vs.push(t.split(/\s*[–-]\s*/)[0]);
+  if(isEnFront()===false){vs.push(t.replace(/^to /i,""))}
+  return vs.map(norm).filter(Boolean);
+}
+function checkType(){
+  var w=cur(),inp=q("ans");if(!inp)return;
+  var v=norm(inp.value);if(!v)return;
+  var ok=variants(w).indexOf(v)>=0;
+  P.fb={ok:ok};ok?P.score.ok++:P.score.bad++;render();
+}
+function renderList(){
+  var sel=selected();
+  var c26=SEMBY.c26.lessons,defL=c26.length?c26[c26.length-1]:"1";
+  var h='<div class="panel"><p class="lbl">הוספת מילה</p><div class="form">'+
+    '<select class="sel" id="nw-sem">'+SEMS.map(function(x){return '<option value="'+x.id+'"'+(x.id==="c26"?' selected':'')+'>'+x.name+'</option>'}).join("")+'</select>'+
+    '<div class="two"><input type="text" id="nw-en" dir="ltr" placeholder="English"><input type="text" id="nw-lesson" value="'+esc(defL)+'" placeholder="שיעור" aria-label="שיעור"></div>'+
+    '<input type="text" id="nw-he" placeholder="עברית">'+
+    '<input type="text" id="nw-ex" dir="ltr" placeholder="Example sentence (optional)">'+
+    '<div class="row"><button class="btn pri" data-act="addword">הוסף</button></div></div></div>';
+  h+='<div class="panel">';
+  if(!sel.length)h+='<div class="empty">בחר שיעור.</div>';
+  else h+='<div class="list">'+sel.map(function(w){
+    var k=S.known[w.id],armed=pendingDel===w.id;
+    return '<div class="item'+(k?' known':'')+'"><div class="t"><div class="en">'+esc(w.en)+'</div><div class="he">'+esc(w.he)+'</div></div><button class="spk" data-act="speakid" data-v="'+esc(w.id)+'">🔊</button>'+ltag(w)+
+     '<button class="btn sm'+(k?'':' ok')+'" data-act="toggle" data-v="'+esc(w.id)+'">'+(k?'החזר':'ידוע ✓')+'</button>'+
+     '<button class="btn sm'+(armed?' danger':'')+'" data-act="del" data-v="'+esc(w.id)+'" aria-label="מחק">'+(armed?'בטוח?':'🗑')+'</button></div>'}).join("")+'</div>';
+  h+='</div>';
+  q("main").innerHTML=h;
+}
+function renderKnown(){
+  var ids=Object.keys(S.known).filter(function(k){return BYID[k]});
+  var h='<div class="panel"><p class="lbl">כל המילים שסימנת כידועות (בכל השיעורים). אפשר להחזיר אותן לתרגול.</p>';
+  if(!ids.length)h+='<div class="empty">עוד לא סימנת מילים.</div>';
+  else{
+    h+='<div class="row" style="margin-bottom:8px"><button class="btn sm" data-act="restoreall">החזר את כולן</button></div><div class="list">'+
+     ids.map(function(id){var w=BYID[id];return '<div class="item"><div class="t"><div class="en">'+esc(w.en)+'</div><div class="he">'+esc(w.he)+'</div></div>'+ltag(w)+'<button class="btn sm" data-act="restore" data-v="'+esc(id)+'">החזר</button></div>'}).join("")+'</div>';
+  }
+  h+='</div>';
+  var gone=BASE_WORDS.filter(function(w){return S.removed[w.id]});
+  if(gone.length)h+='<div class="panel"><p class="lbl">מילים מקוריות שמחקת</p><div class="list">'+gone.map(function(w){return '<div class="item"><div class="t"><div class="en">'+esc(w.en)+'</div></div>'+ltag(w)+'<button class="btn sm" data-act="undelete" data-v="'+esc(w.id)+'">שחזר</button></div>'}).join("")+'</div></div>';
+  h+='<div class="panel"><p class="lbl">גיבוד / שחזור הרשימה (הנתונים נשמרים בדפדפן הזה; כאן אפשר להעתיק אותם למקום אחר)</p>'+
+   '<textarea id="io" spellcheck="false">'+esc(JSON.stringify({known:ids,custom:S.custom,removed:Object.keys(S.removed)}))+'</textarea>'+
+   '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy">העתק</button><button class="btn sm pri" data-act="import">טען מהתיבה</button></div>'+
+   '<div class="lbl" id="iomsg" style="margin-top:8px">'+esc(P.msg)+'</div></div>';
+  q("main").innerHTML=h;
+}
+function render(){
+  renderTop();
+  ({cards:renderCards,quiz:renderQuiz,type:renderType,listen:renderListen,list:renderList,known:renderKnown})[S.tab]();
+  autoSpeak();
+}
+
+// ---------- listen mode ----------
+var L={on:false,list:[],idx:0,token:0,lock:null};
+function tmsg(m){var t=q("toast");if(t)t.textContent=m||""}
+function cleanHe(s){return s.replace(/\.\.\./g,"").replace(/\s*[–\/]\s*/g,", ").replace(/[()]/g," ")}
+function cleanEn(s){return s.replace(/\(.*?\)/g,"").replace(/\.\.\./g,"").replace(/\s*[–\/]\s*/g,", ")}
+function buildList(){var l=pool();return S.listen.shuf?shuffle(l):l}
+function say(text,lang,cb){
+  var done=false,t;
+  function fin(){if(done)return;done=true;clearTimeout(t);cb()}
+  try{
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang=lang==="he"?"he-IL":"en-US";u.rate=S.listen.rate;
+    var vs=speechSynthesis.getVoices()||[];
+    var pre=lang==="he"?["he","iw"]:["en"];
+    var v=vs.filter(function(x){var l=(x.lang||"").toLowerCase();return pre.some(function(p){return l.indexOf(p)===0})})[0];
+    if(v)u.voice=v;
+    u.onend=fin;u.onerror=fin;
+    t=setTimeout(fin,6000+text.length*250);
+    speechSynthesis.speak(u);
+  }catch(e){fin()}
+}
+function updNow(w){
+  setMedia(w);drawPip();
+  var el=q("lnow");if(!el)return;
+  el.innerHTML='<div class="big he">'+esc(w.he)+'</div><div class="big" dir="ltr" style="margin-top:8px">'+esc(w.en)+'</div><div class="hint">'+(L.idx+1)+' / '+L.list.length+'</div>';
+}
+function stopListen(){
+  L.on=false;L.token++;
+  try{speechSynthesis.cancel()}catch(e){}
+  try{if(L.lock){L.lock.release();L.lock=null}}catch(e){}
+}
+function lstep(tok){
+  if(tok!==L.token||!L.on)return;
+  if(L.idx<0)L.idx=0;
+  if(L.idx>=L.list.length){L.list=buildList();L.idx=0;if(!L.list.length){stopListen();renderListen();return}}
+  var w=L.list[L.idx];updNow(w);
+  say(cleanHe(w.he),"he",function(){
+    if(tok!==L.token)return;
+    setTimeout(function(){
+      if(tok!==L.token)return;
+      say(cleanEn(w.en),"en",function(){
+        if(tok!==L.token)return;
+        setTimeout(function(){if(tok!==L.token)return;L.idx++;lstep(tok)},S.listen.gap*1000);
+      });
+    },S.listen.pause*1000);
+  });
+}
+function startListen(){
+  tmsg("");
+  if(!("speechSynthesis" in window)||typeof SpeechSynthesisUtterance==="undefined"){tmsg("ההקראה לא נתמכת בדפדפן הזה.");return}
+  if(!L.list.length||L.idx>=L.list.length){L.list=buildList();L.idx=0}
+  if(!L.list.length){renderListen();return}
+  stopListen();L.on=true;
+  try{if(navigator.wakeLock){navigator.wakeLock.request("screen").then(function(l){L.lock=l},function(){})}}catch(e){}
+  renderListen();lstep(L.token);
+}
+function jump(d){
+  if(!L.on)return;
+  try{speechSynthesis.cancel()}catch(e){}
+  L.token++;L.idx=Math.max(0,L.idx+d);lstep(L.token);
+}
+function listenKnown(){
+  if(!L.on||!L.list[L.idx])return;
+  S.known[L.list[L.idx].id]=1;save();
+  L.list.splice(L.idx,1);
+  try{speechSynthesis.cancel()}catch(e){}
+  L.token++;renderTop();lstep(L.token);
+}
+var PIP={v:null,c:null,t:null,ctx:null};
+function setMedia(w){
+  try{
+    var ms=navigator.mediaSession;if(!ms)return;
+    ms.metadata=new MediaMetadata({title:w.en,artist:w.he,album:"אוצר מילים S3"});
+    ms.setActionHandler("nexttrack",function(){jump(1)});
+    ms.setActionHandler("previoustrack",function(){jump(-1)});
+    ms.setActionHandler("pause",function(){stopListen();renderListen()});
+    ms.setActionHandler("play",function(){startListen()});
+  }catch(e){}
+}
+function drawPip(){
+  var c=PIP.c;if(!c)return;
+  var g=c.getContext("2d"),w=L.on&&L.list[L.idx];
+  g.fillStyle="#1c1f2a";g.fillRect(0,0,c.width,c.height);
+  g.textAlign="center";
+  g.direction="rtl";g.fillStyle="#ffffff";g.font="bold 54px system-ui,Arial";
+  g.fillText(w?w.he:"אוצר מילים",c.width/2,150,600);
+  g.direction="ltr";g.fillStyle="#8b86ff";g.font="bold 44px system-ui,Arial";
+  g.fillText(w?w.en:"",c.width/2,240,600);
+  g.fillStyle="#9aa1b2";g.font="22px system-ui,Arial";
+  g.fillText(w?(L.idx+1)+" / "+L.list.length:"",c.width/2,310);
+}
+function startPip(){
+  var MSG="לא הצלחתי לפתוח חלון צף כאן. נסה לפתוח את הדף ישירות בכרום, או השתמש בחלון קופץ של סמסונג.";
+  if(!document.pictureInPictureEnabled){tmsg(MSG);return}
+  try{
+    if(!PIP.c){
+      PIP.c=document.createElement("canvas");PIP.c.width=640;PIP.c.height=360;
+      var st=PIP.c.captureStream(10);
+      try{
+        var AC=window.AudioContext||window.webkitAudioContext;PIP.ctx=new AC();
+        var o=PIP.ctx.createOscillator(),gn=PIP.ctx.createGain(),d=PIP.ctx.createMediaStreamDestination();
+        gn.gain.value=0.001;o.connect(gn);gn.connect(d);o.start();
+        st.addTrack(d.stream.getAudioTracks()[0]);
+      }catch(e){}
+      PIP.v=document.createElement("video");PIP.v.playsInline=true;PIP.v.srcObject=st;
+      PIP.v.style.cssText="position:fixed;width:2px;height:2px;opacity:0;pointer-events:none";
+      document.body.appendChild(PIP.v);
+      PIP.v.addEventListener("leavepictureinpicture",function(){clearInterval(PIP.t)});
+    }
+    try{if(PIP.ctx)PIP.ctx.resume()}catch(e){}
+    drawPip();clearInterval(PIP.t);PIP.t=setInterval(drawPip,500);
+    PIP.v.play().then(function(){return PIP.v.requestPictureInPicture()}).then(function(){tmsg("")}).catch(function(){tmsg(MSG)});
+  }catch(e){tmsg(MSG)}
+}
+function renderListen(){
+  var n=pool().length;
+  if(!selected().length){q("main").innerHTML='<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>';return}
+  if(!n){q("main").innerHTML='<div class="panel empty">אין מילים להאזנה – כולן מסומנות כידועות.</div>';return}
+  function sel(k,vals,labels){return '<select class="sel" data-act="lset" data-k="'+k+'">'+vals.map(function(v,i){return '<option value="'+v+'"'+(+S.listen[k]===v?' selected':'')+'>'+labels[i]+'</option>'}).join("")+'</select>'}
+  var w=L.on&&L.list[L.idx];
+  var now=w?'<div class="big he">'+esc(w.he)+'</div><div class="big" dir="ltr" style="margin-top:8px">'+esc(w.en)+'</div><div class="hint">'+(L.idx+1)+' / '+L.list.length+'</div>':'<div class="hint">'+n+' מילים מוכנות להאזנה<br>לחץ ▶ להתחלה</div>';
+  q("main").innerHTML='<div class="panel"><p class="lbl">מקריא את כל המילים שעוד לא סימנת כידועות (לפי השיעורים שבחרת): קודם עברית, אחרי הפסקה אנגלית, ובסוף הרשימה מתחיל מחדש בלופ.</p>'+
+   '<div id="lnow" class="card" style="min-height:150px;cursor:default;padding:16px">'+now+'</div>'+
+   '<div class="row c" style="margin-top:10px"><button class="btn" data-act="lprev">⏮</button>'+
+   '<button class="btn pri" style="font-size:20px;padding:8px 26px" data-act="lplay">'+(L.on?'⏸ עצור':'▶ נגן')+'</button>'+
+   '<button class="btn" data-act="lnext">⏭</button><button class="btn ok" data-act="lknown">ידוע ✓</button></div><div class="row c" style="margin-top:8px"><button class="btn sm" data-act="pip">🪟 חלון צף (תמונה בתמונה)</button></div></div>'+
+   '<div class="panel"><div class="row" style="gap:12px">'+
+   '<label class="lbl" style="margin:0">הפסקה עברית→אנגלית '+sel("pause",[0.5,1,2,3],["חצי שנייה","שנייה","2 שניות","3 שניות"])+'</label>'+
+   '<label class="lbl" style="margin:0">בין מילים '+sel("gap",[1,2,3,5],["שנייה","2 שניות","3 שניות","5 שניות"])+'</label>'+
+   '<label class="lbl" style="margin:0">מהירות '+sel("rate",[0.7,0.85,1,1.15],["איטית","קצת איטית","רגילה","מהירה"])+'</label>'+
+   '<label style="font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" data-act="lset" data-k="shuf"'+(S.listen.shuf?' checked':'')+'> ערבוב</label></div>'+
+   '<p class="lbl" style="margin-top:10px">טיפ לנסיעה: השאר את המסך דלוק וחבר לבלוטות׳ לרכב. אם המסך ננעל, הדפדפן עלול להפסיק את ההקראה. צריך קול עברי מותקן במכשיר.</p></div>';
+}
+
+// ---------- events ----------
+function autoSpeak(){
+  if(!S.auto||["cards","quiz","type"].indexOf(S.tab)<0)return;
+  var w=cur();if(!w)return;
+  if(!(isEnFront()||P.flip||P.ans!==null||P.fb!==null))return;
+  if(P.spoken===w.id)return;
+  P.spoken=w.id;speak();
+}
+function speak(id){
+  var w=id?BYID[id]:cur();if(!w)return;
+  var NO="לא נשמע קול. ההקראה לא עובדת במסך הזה (כנראה בגלל האפליקציה או הדפדפן). נסה לפתוח את הקישור בכרום או בספארי, ובדוק שהטלפון לא על שקט והעוצמה לא מונמכת.";
+  var tt=q("toast");if(tt)tt.textContent="";
+  if(!("speechSynthesis" in window)||typeof SpeechSynthesisUtterance==="undefined"){if(tt)tt.textContent=NO;return}
+  try{
+    var u=new SpeechSynthesisUtterance(w.en.replace(/\(.*?\)/g,"").replace(/\s*\/\s*/g,", "));
+    u.lang="en-US";u.rate=.9;
+    var vs=speechSynthesis.getVoices()||[];
+    var ev=vs.filter(function(x){return /^en/i.test(x.lang)})[0];if(ev)u.voice=ev;
+    u.onerror=function(){if(tt)tt.textContent=NO};
+    speechSynthesis.cancel();speechSynthesis.speak(u);
+    setTimeout(function(){if(!speechSynthesis.speaking&&!speechSynthesis.pending&&tt&&!u._ok)tt.textContent=NO},1500);
+    u.onstart=function(){u._ok=1;if(tt)tt.textContent=""};
+  }catch(e){if(tt)tt.textContent=NO}
+}
+document.addEventListener("change",function(e){
+  var t=e.target;
+  if(t.dataset&&t.dataset.act==="dir"){S.dir=t.value;save();resetPractice();render()}
+  else if(t.dataset&&t.dataset.act==="lset"){S.listen[t.dataset.k]=t.type==="checkbox"?t.checked:+t.value;save()}
+});
+document.addEventListener("click",function(e){
+  var el=e.target.closest("[data-act]");if(!el||el.tagName==="SELECT")return;
+  var a=el.dataset.act,v=el.dataset.v;
+  switch(a){
+    case"lesson":S.sel[v]=S.sel[v]?0:1;selChanged();break;
+    case"sem":toggleKeys(semKeys(SEMBY[v]));break;
+    case"year":toggleKeys(yearKeys(+v));break;
+    case"all":allKeys().forEach(function(k){S.sel[k]=1});selChanged();break;
+    case"none":S.sel={};selChanged();break;
+    case"fopen":S.fopen=!S.fopen;renderTop();break;
+    case"tab":S.tab=v;save();resetPractice();render();break;
+    case"restart":resetPractice();render();break;
+    case"flip":P.flip=!P.flip;render();break;
+    case"speak":speak();break;
+    case"speakid":speak(v);break;
+    case"lplay":if(L.on){stopListen();renderListen()}else startListen();break;
+    case"lprev":jump(-1);break;
+    case"lnext":jump(1);break;
+    case"lknown":listenKnown();break;
+    case"pip":startPip();break;
+    case"auto":S.auto=!S.auto;save();if(S.auto){P.spoken=null;autoSpeak()}break;
+    case"skip":next();break;
+    case"back":if(P.i>0){P.i--;P.flip=false;P.ans=null;P.fb=null;P.spoken=null;makeOpts();render()}break;
+    case"know":markKnown(P.queue[P.i]);break;
+    case"opt":if(P.ans===null){P.ans=+v;P.opts[+v]===back(cur())?P.score.ok++:P.score.bad++;render()}break;
+    case"check":checkType();break;
+    case"reveal":P.fb={ok:false};P.score.bad++;render();break;
+    case"toggle":S.known[v]?delete S.known[v]:S.known[v]=1;save();resetPractice();render();break;
+    case"restore":unknown(v);resetPractice();render();break;
+    case"restoreall":S.known={};save();resetPractice();render();break;
+    case"addword":addWord();break;
+    case"del":deleteWord(v);break;
+    case"undelete":delete S.removed[v];save();applyUserWords();resetPractice();render();break;
+    case"copy":
+      var ta=q("io");ta.select();
+      try{navigator.clipboard.writeText(ta.value).then(function(){q("iomsg").textContent="הועתק ✓"},function(){q("iomsg").textContent="סמן והעתק ידנית"})}catch(err){q("iomsg").textContent="סמן והעתק ידנית"}
+      break;
+    case"import":
+      try{
+        var data=JSON.parse(q("io").value),arr=Array.isArray(data)?data:data.known;if(!Array.isArray(arr))throw 0;
+        if(!Array.isArray(data)){S.custom=Array.isArray(data.custom)?data.custom:S.custom;S.removed={};(data.removed||[]).forEach(function(id){S.removed[id]=1});applyUserWords()}
+        var k={};arr.forEach(function(id){if(BYID[id])k[id]=1});
+        S.known=k;save();P.msg="נטען ✓ ("+Object.keys(k).length+" מילים)";resetPractice();render();
+      }catch(err){q("iomsg").textContent="פורמט לא תקין"}
+      break;
+  }
+});
+resetPractice();render();
+</script>
 </body>
 </html>

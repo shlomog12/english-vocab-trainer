@@ -1,13 +1,10 @@
 # English Vocab Trainer
 
-Hebrew/English vocabulary practice (cards, quiz, typing) plus a listening mode that keeps playing
-with the screen off or the browser minimized.
+Hebrew/English vocabulary practice (cards, quiz, typing) and a listening mode that reads the words aloud
+with the browser's own voices. Static site, no build step.
 
-- `index.html` + `app.js` – the app (static, no build step)
-- `words.json` – the base word list (words can also be added/removed in the app)
-- `audio.js` – assembles the whole listening session into one WAV (tested: `npm test`)
-- `tts.js` – eSpeak-NG (WASM, loaded from jsDelivr) + IndexedDB cache of generated audio
-- `bg-test.html` – background-playback test page
+- `index.html` – the app
+- `data.js` – words for the earlier semesters (`RAW2`); the current semester's words are inside `index.html`
+- Words can also be added and removed from the "רשימה" tab; they are stored in the browser.
 
-Listening mode plays one real `<audio>` element, which is what lets the browser keep it alive in the background.
-Use the "בדיקת מנוע" button in the listen tab to verify the TTS engine loads.
+The listening mode uses the browser's speech synthesis, so it stops when the browser is minimized or the screen is off.
