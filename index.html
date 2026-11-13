@@ -526,21 +526,16 @@ function startPip(){
   if(!document.pictureInPictureEnabled){tmsg(MSG);return}
   try{ensurePip().then(function(){return PIP.v.requestPictureInPicture()}).then(function(){tmsg("")}).catch(function(){tmsg(MSG)})}catch(e){tmsg(MSG)}
 }
-// Experiment: let Chrome open the floating window by itself when the page is hidden/minimized while listening
+// Chrome opens the floating window by itself when you switch to another tab while listening (not on minimize)
 function setupAutoPip(){
   if(!document.pictureInPictureEnabled){setPipStat("PiP אוטומטי: לא נתמך בדפדפן הזה");return}
-  try{ensurePip().then(function(){setPipStat("PiP אוטומטי: מוכן. מזער את הכרום ובדוק אם נפתח חלון צף.")},function(){setPipStat("PiP אוטומטי: הוידאו לא התחיל")})}catch(e){}
+  try{ensurePip().then(function(){setPipStat("PiP אוטומטי: מוכן. עבור ללשונית אחרת והחלון הצף ייפתח לבד.")},function(){setPipStat("PiP אוטומטי: הוידאו לא התחיל")})}catch(e){}
   try{
     navigator.mediaSession.setActionHandler("enterpictureinpicture",function(){
       return PIP.v.requestPictureInPicture().then(function(){setPipStat("PiP אוטומטי: נפתח אוטומטית ✅")},function(e){setPipStat("PiP אוטומטי: נחסם ("+(e&&e.name||"?")+")")})
     });
   }catch(e){setPipStat("PiP אוטומטי: הדפדפן לא תומך בפעולה (צריך כרום 134 ומעלה)")}
 }
-document.addEventListener("visibilitychange",function(){
-  if(document.hidden&&L.on&&PIP.v&&!document.pictureInPictureElement){
-    try{PIP.v.requestPictureInPicture().then(function(){setPipStat("נפתח כשהדף הוסתר ✅")},function(e){setPipStat("ניסיון פתיחה בעת הסתרה נחסם ("+(e&&e.name||"?")+")")})}catch(e){}
-  }
-});
 function renderListen(){
   var n=pool().length;
   if(!selected().length){q("main").innerHTML='<div class="panel empty">בחר לפחות שיעור אחד למעלה.</div>';return}
