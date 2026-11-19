@@ -182,7 +182,28 @@ var RAW=[
 [5,"I wish I was more reliable and creative","הלוואי שהייתי יותר אמין ויצירתי",""],
 [5,"I want to be more creative","אני רוצה להיות יותר יצירתי",""],
 [5,"Determined","נחוש","She is determined to achieve her goals."],
-[5,"Meticulous","קפדן","It's hard working with such a meticulous person."]
+[5,"Meticulous","קפדן","It's hard working with such a meticulous person."],
+[6,"To elect someone","לבחור במישהו","The members of the club will elect a new leader next week."],
+[6,"Voters","בוחרים","Many voters waited in long lines outside the polling station."],
+[6,"To vote","להצביע","The committee will vote on the new proposal tomorrow."],
+[6,"Equal opportunities","הזדמנויות שוות","The company promises equal opportunities for all its employees."],
+[6,"Judge","שופט","The judge listened carefully to both sides of the argument."],
+[6,"To judge","לשפוט","You should not judge people before you really know them."],
+[6,"To break the law","להפר את החוק","Anyone who steals is choosing to break the law."],
+[6,"Agree","להסכים","I completely agree with your opinion about the plan."],
+[6,"In addition","בנוסף","The hotel has a large pool, and in addition, it offers free breakfast."],
+[6,"To convince","לשכנע","She tried to convince her brother to help her with the project."],
+[6,"Candidate","מועמד","The manager interviewed every candidate who applied for the job."],
+[6,"Swing state","מדינת מדרון","A swing state is a state where both parties have a real chance to win."],
+[6,"Turnout","כמות משתתפים","The charity event had a huge turnout despite the heavy rain."],
+[6,"Reality","מציאות","After years of hard work, her dream finally became a reality."],
+[6,"Healthy","בריא","Eating fresh fruit and vegetables keeps the body healthy."],
+[6,"Pronunciation","הגייה",""],
+[6,"Politicians","פוליטיקאים",""],
+[6,"Representatives","נציגים",""],
+[6,"Politics","פוליטיקה",""],
+[6,"Taught","לימד / נלמד",""],
+[6,"Contribute","לתרום",""]
 ];
 var SEMS=[
  {id:"a25",name:"סמסטר א׳ 2025",short:"א׳25",year:2025},
@@ -207,11 +228,11 @@ WORDS=WORDS.map(function(w,i){return {w:w,i:i}}).sort(function(a,b){return SEMBY
 var BASE_WORDS=WORDS.slice();
 WORDS.forEach(function(w){var s=SEMBY[w.sem];if(s.lessons.indexOf(w.lesson)<0)s.lessons.push(w.lesson)});
 function ltag(w){return '<span class="ltag">'+SEMBY[w.sem].short+' · ש'+esc(w.lesson)+'</span>'}
-var LESSONS=[1,2,3,4,5];
+var LESSONS=[1,2,3,4,5,6];
 
 // ---------- state ----------
 var KEY="eng-s3-2026-v1";
-var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1},fopen:false,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
+var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1,"c26:6":1},fopen:false,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
 // state saved by the first GitHub-pages version (same word ids) is carried over once
 function migrateOld(){try{var o=JSON.parse(localStorage.getItem("eng-vocab-trainer-v1")||"null");if(!o)return null;
   return {known:o.known||{},removed:o.removed||{},dir:o.dir,custom:(o.custom||[]).map(function(c){return {id:c.id,sem:"c26",lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||""}})}}catch(e){return null}}
