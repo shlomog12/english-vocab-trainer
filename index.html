@@ -203,7 +203,36 @@ var RAW=[
 [6,"Representatives","נציגים",""],
 [6,"Politics","פוליטיקה",""],
 [6,"Taught","לימד / נלמד",""],
-[6,"Contribute","לתרום",""]
+[6,"Contribute","לתרום",""],
+[7,"Thursday","יום חמישי","The English exam is on Thursday, so I will study every evening."],
+[7,"Citizenship","אזרחות","She lived here for five years before she received her citizenship."],
+[7,"Attractive","מושך","The actor is tall, funny, and very attractive."],
+[7,"Jealousy","קנאה","His jealousy almost destroyed their friendship."],
+[7,"To be jealous","לקנא","Try not to be jealous when your friends succeed."],
+[7,"To clash","להתנגש","The two meetings clash, so I can attend only one of them."],
+[7,"Too","גם","I want to come to the cinema too."],
+[7,"Greek","יווני","We ate a big Greek salad with cheese and olives."],
+[7,"Ahead","לפנינו","We have three busy months ahead of us at work."],
+[7,"Myth","מיתוס","Some people still believe the myth that the Great Wall is visible from space."],
+[7,"He has","יש לו","My uncle is very lucky — he has a house near the beach."],
+[7,"Shines","מאיר","The sun shines brightly over the sea all summer."],
+[7,"Shining","מבריק","He cleaned his old car until it was shining."],
+[7,"Shield","מגן","The soldier raised his shield and moved forward slowly."],
+[7,"Clever","פיקח","The clever boy built a small robot for the science fair."],
+[7,"Considering","שוקל","He is considering a new job in the south of the country."],
+[7,"Chop","לקצוץ","First, chop the onion into small pieces."],
+[7,"Ancient","עתיק","The museum has ancient coins from the time of the Romans."],
+[7,"Prince","נסיך","The young prince will become king when he turns twenty-one."],
+[7,"Main","ראשי","The main street of the city is full of shops and cafés."],
+[7,"Norway","נורווגיה",""],
+[7,"London","לונדון",""],
+[7,"Wooden","עשוי עץ",""],
+[7,"Athens","אתונה",""],
+[7,"Crete","כרתים",""],
+[7,"Cyprus","קפריסין",""],
+[7,"Take – took","לקחת – לקח",""],
+[7,"Teach – taught","ללמד – לימד",""],
+[7,"Bring – brought","להביא – הביא",""]
 ];
 var SEMS=[
  {id:"a25",name:"סמסטר א׳ 2025",short:"א׳25",year:2025},
@@ -228,11 +257,11 @@ WORDS=WORDS.map(function(w,i){return {w:w,i:i}}).sort(function(a,b){return SEMBY
 var BASE_WORDS=WORDS.slice();
 WORDS.forEach(function(w){var s=SEMBY[w.sem];if(s.lessons.indexOf(w.lesson)<0)s.lessons.push(w.lesson)});
 function ltag(w){return '<span class="ltag">'+SEMBY[w.sem].short+' · ש'+esc(w.lesson)+'</span>'}
-var LESSONS=[1,2,3,4,5,6];
+var LESSONS=[1,2,3,4,5,6,7];
 
 // ---------- state ----------
 var KEY="eng-s3-2026-v1";
-var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1,"c26:6":1},fopen:false,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
+var S={custom:[],removed:{},known:{},sel:{"c26:1":1,"c26:2":1,"c26:3":1,"c26:4":1,"c26:5":1,"c26:6":1,"c26:7":1},fopen:false,dir:"en2he",tab:"cards",auto:false,listen:{pause:1,gap:2,rate:1,shuf:false}};
 // state saved by the first GitHub-pages version (same word ids) is carried over once
 function migrateOld(){try{var o=JSON.parse(localStorage.getItem("eng-vocab-trainer-v1")||"null");if(!o)return null;
   return {known:o.known||{},removed:o.removed||{},dir:o.dir,custom:(o.custom||[]).map(function(c){return {id:c.id,sem:"c26",lesson:String(c.lesson),en:c.en,he:c.he,ex:c.ex||""}})}}catch(e){return null}}
